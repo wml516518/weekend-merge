@@ -1,0 +1,9 @@
+.netlify
+.playwright-cli
+.superpowers
+.worktrees
+coverage
+dist
+dist-server
+node_modules
+output

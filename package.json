@@ -8,12 +8,17 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && tsc --noEmit -p tsconfig.functions.json && vite build",
+    "build": "tsc -b && tsc --noEmit -p tsconfig.functions.json && vite build && npm run build:server",
     "preview": "vite preview",
     "test": "vitest --passWithNoTests",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:server": "esbuild scripts/server.ts --bundle --platform=node --format=esm --outfile=dist-server/server.mjs --external:react --external:react-dom --external:lucide-react --external:zustand --log-level=warning",
+    "start": "node dist-server/server.mjs",
+    "build:web": "tsc -b && vite build",
+    "build:server:only": "tsc --noEmit -p tsconfig.functions.json && npm run build:server"
   },
   "dependencies": {
+    "esbuild": "0.28.2",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
