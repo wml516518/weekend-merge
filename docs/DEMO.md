@@ -1,6 +1,6 @@
 # 本地 Agent 演示
 
-在项目根目录操作。需要 Node.js 22+ 和已安装的 Netlify CLI；只有把固定请求转换为实时请求或运行锁定冲突示例时才需要 `jq`。先运行 `npm install`，然后在单独终端运行 `netlify dev`；以下命令使用其默认地址 `http://localhost:8888`。这些命令会调用本地 Function；仅在配置 DeepSeek 后，实时规划才会请求模型。演示日期和地点是固定样例，实际出行前需重新核对。
+在项目根目录操作。需要 Node.js 22+。先运行 `npm install`，再用 `npm run dev`，可通过 `http://localhost:5173` 调用本地 Function；若使用 Netlify CLI，可运行 `netlify dev`，默认端口为 `8888`。以下示例使用 `8888`，使用 Vite 时换成 `5173`。只有把固定请求转换为实时请求或运行锁定冲突示例时才需要 `jq`。实时规划在配置 DeepSeek 后会调用模型。演示日期和地点是固定样例，实际出行前需重新核对。
 
 ## 固定规划事件
 

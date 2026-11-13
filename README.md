@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-Vite 默认地址 `http://localhost:5173` 可体验首页演示。完整的实时规划和重排需要运行 Netlify Functions。安装 Netlify CLI 后在项目目录运行 `netlify dev`，通过其代理地址（默认 `http://localhost:8888`）进入。未配置模型密钥时，实时规划会显示规则降级。API 请求示例见 [演示步骤](docs/DEMO.md)。
+打开 `http://localhost:5173` 调试前端、实时规划和局部重排。Vite 开发服务器会调用仓库内的两个 Function handler；未配置模型密钥时会显示规则降级。要验证 Netlify 自身的路由和运行环境，可另用 `netlify dev`（默认 `http://localhost:8888`）。API 请求示例见 [演示步骤](docs/DEMO.md)。
 
 ```bash
 npm test -- --run

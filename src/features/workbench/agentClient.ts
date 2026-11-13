@@ -63,7 +63,7 @@ async function readAgentResponse(
     throw new Error(agentErrorMessage(body?.error?.code ?? (response.status === 429 ? "RATE_LIMITED" : "")));
   }
   if (!response.headers.get("Content-Type")?.toLowerCase().startsWith("application/x-ndjson") || !response.body) {
-    throw new Error("规划接口未返回事件流，请通过 Netlify 站点或 Netlify Dev 使用实时规划。");
+    throw new Error("规划接口未返回事件流，本地请通过 npm run dev 或 netlify dev 启动后重试。");
   }
 
   const reader = response.body.getReader();
