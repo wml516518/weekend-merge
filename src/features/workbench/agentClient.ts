@@ -56,7 +56,6 @@ async function readAgentResponse(
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/x-ndjson" },
     body: JSON.stringify(request),
-    signal,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);

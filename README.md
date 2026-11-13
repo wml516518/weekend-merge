@@ -54,6 +54,45 @@ npm run build
 
 `DEEPSEEK_API_KEY` 与 `DEEPSEEK_MODEL` 只应配置为 Netlify Functions 的服务端环境变量，不能使用 `VITE_` 前缀。没有密钥时生产站仍可运行，并会明确降级到确定性规则规划；添加密钥后启用 DeepSeek Tool Calls。基础响应安全头由 `netlify.toml` 统一设置，CSP 将在地图瓦片来源确定后单独收紧。
 
+## 自有服务器部署
+
+仓库内置 Node 服务器入口，同时托管 Vite 静态产物和两个 API handler，保留前端已使用的 `/.netlify/functions/plan` 与 `/.netlify/functions/replan` 路径：
+
+```bash
+npm ci
+npm run build
+HOST=127.0.0.1 PORT=8787 npm run start
+```
+
+`dist-server/server.mjs` 只读取 `dist` 静态产物、处理 SPA 回退并调用两个 Function；`DEEPSEEK_API_KEY` 和 `DEEPSEEK_MODEL` 仍是服务器进程环境变量。服务器已有 Node.js 22+ 时，建议用最小运行时依赖启动：
+
+```bash
+npm ci --omit=dev
+npm run build:server
+HOST=127.0.0.1 PORT=8787 npm run start
+```
+
+注意：完整前端构建仍需要开发依赖；上一条 `npm ci --omit=dev` 适用于部署已在本机构建好的 `dist/` 和 `dist-server/` 产物。默认 `TRUSTED_PROXY_DEPTH=1` 表示只信任直接反向代理写入的最右侧 `X-Forwarded-For` 值；有固定多层代理时，把它设置为可信代理层数。也可使用 Docker：
+
+```bash
+docker build -t weekend-merge .
+docker run --rm -p 127.0.0.1:8787:8787 --env-file .env weekend-merge
+```
+
+反向代理必须开启 HTTP/1.1、关闭缓冲并透传 `Content-Type`、`Connection` 和一个可信的 `X-Forwarded-For` 首值。Nginx 示例：
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:8787;
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";
+  proxy_set_header X-Forwarded-For $remote_addr;
+  proxy_buffering off;
+}
+```
+
+Cloudflare 把子域 A/AAAA/CNAME 记录指向服务器并开启代理即可；SSL/TLS 使用 Full (strict)。不要缓存 `/.netlify/functions/` 路径。实时限流按请求处理器见到的首个可信 IP 与 `sessionId` 组合计算，反向代理不能透传任意客户端伪造的转发头。
+
 ## 接口与数据边界
 
 | 路径 | 职责 |

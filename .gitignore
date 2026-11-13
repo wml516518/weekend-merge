@@ -4,6 +4,7 @@ dist/
 .env
 .env.local
 coverage/
+dist-server/
 output/
 .playwright-cli/
 .worktrees/
