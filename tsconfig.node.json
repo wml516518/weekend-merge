@@ -15,12 +15,13 @@
     }
   },
   "include": [
-      "vite.config.ts",
-      "scripts/server.ts",
-      "netlify/functions/**/*.ts",
-      "src/contracts/**/*.ts",
-      "src/demo/demoRun.ts",
-      "data/**/*.json"
+    "vite.config.ts",
+    "scripts/local-functions.ts",
+    "scripts/server.ts",
+    "netlify/functions/**/*.ts",
+    "src/contracts/**/*.ts",
+    "src/demo/demoRun.ts",
+    "data/**/*.json"
   ],
   "exclude": ["**/*.test.ts", "**/*.test.tsx"]
 }

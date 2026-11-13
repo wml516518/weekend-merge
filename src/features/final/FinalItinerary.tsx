@@ -19,18 +19,20 @@ export function FinalItinerary({
   setup,
   onBack,
   readOnly = false,
+  live = false,
 }: {
   plan: Itinerary;
   setup?: PlanSetup;
   onBack?: () => void;
   readOnly?: boolean;
+  live?: boolean;
 }) {
   const [message, setMessage] = useState("");
   const [exporting, setExporting] = useState(false);
   async function download() {
     setExporting(true);
     try {
-      await exportItinerary(plan, setup);
+      await exportItinerary(plan, setup, live);
       setMessage("行程长图已生成。");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "导出失败，请重试。");
@@ -118,12 +120,12 @@ export function FinalItinerary({
             <p>
               {setup
                 ? `预算余量 ¥${setup.budget - plan.totalCost}`
-                : "费用来自演示方案"}{" "}
+                : "费用为估算"}{" "}
               · 费用拆分以工具结果为准
             </p>
             <hr />
             <div>
-              <span>预计步行</span>
+              <span>预计总路程</span>
               <b>{plan.totalDistanceKm} km</b>
             </div>
             <div>
@@ -131,7 +133,7 @@ export function FinalItinerary({
               <b>{plan.indoorRatio}%</b>
             </div>
             <div>
-              <span>换乘次数</span>
+              <span>{live || readOnly ? "预计交通段" : "换乘次数"}</span>
               <b>{plan.transfers} 次</b>
             </div>
           </div>
@@ -171,7 +173,7 @@ export function FinalItinerary({
         <RouteMap plan={plan} />
       </div>
       <p className="final-disclaimer">
-        当前为前端演示。地点、价格与天气信息未实时核验；路线为示意估算，非实时导航。实际出发前请确认营业与天气信息。
+        {live || readOnly ? "路线与费用为估算。出发前请核对营业时间、票价和天气。" : "演示行程。地点、价格与天气为预设数据。"}
       </p>
     </main>
   );

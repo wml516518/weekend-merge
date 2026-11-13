@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -23,11 +23,13 @@ import {
   Wallet,
   WandSparkles,
 } from "lucide-react";
-import type { AgentEvent } from "@/contracts/agent";
+import { ReplanRequestSchema, type AgentEvent, type ReplanReasonCode } from "@/contracts/agent";
+import { WeatherEvidenceSchema } from "@/contracts/evidence";
 import { dateLabel, Modal, Tag } from "@/components/Ui";
 import { RouteMap } from "@/components/RouteMap";
 import { usePlanningStore } from "@/state/usePlanningStore";
 import { getCandidates, getRunStatus } from "./events";
+import { requestAgent } from "./agentClient";
 
 const toolLabels: Record<string, string> = {
   get_weather: "查看周末天气",
@@ -36,17 +38,29 @@ const toolLabels: Record<string, string> = {
   calculate_budget: "核算两人花费",
   validate_plan: "检查行程约束",
 };
+const vetoReasons: { label: string; code: ReplanReasonCode }[] = [
+  { label: "不感兴趣", code: "CHANGE_PLACE" },
+  { label: "想换一种体验", code: "CHANGE_ACTIVITY" },
+  { label: "担心拥挤或排队", code: "TOO_CROWDED" },
+  { label: "不符合饮食偏好", code: "CHANGE_PLACE" },
+  { label: "其他原因", code: "CHANGE_PLACE" },
+];
 export function PlanningWorkbench({
   events,
+  mode = "demo",
+  planError,
   onRetry,
   onEdit,
 }: {
   events: AgentEvent[];
+  mode?: "demo" | "live";
+  planError?: string;
   onRetry?: () => void;
   onEdit?: () => void;
 }) {
   const candidates = useMemo(() => getCandidates(events), [events]);
-  const status = getRunStatus(events);
+  const status = planError ? { state: "failed" as const, message: planError } : getRunStatus(events);
+  const live = mode === "live";
   const store = usePlanningStore();
   const { setup, preferences } = store;
   const [drawer, setDrawer] = useState<"detail" | "trace">("detail");
@@ -54,6 +68,9 @@ export function PlanningWorkbench({
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  const [replanning, setReplanning] = useState(false);
+  const pendingReplan = useRef<AbortController | null>(null);
+  useEffect(() => () => pendingReplan.current?.abort(), []);
   const base =
     candidates.find((p) => p.id === store.activePlanId) ?? candidates[0];
   const plan = base ? (store.revisedPlans[base.id] ?? base) : undefined;
@@ -64,6 +81,7 @@ export function PlanningWorkbench({
   ];
   const failures = events.filter((e) => e.type === "tool.failed");
   const weather = completedTools.find((e) => e.tool === "get_weather");
+  const liveWeather = WeatherEvidenceSchema.safeParse(weather?.summary).data;
   const active =
     plan?.stops.find((p) => p.id === store.activeStopId) ?? plan?.stops[0];
   const locked =
@@ -77,7 +95,7 @@ export function PlanningWorkbench({
         ...(setup && plan.totalCost > setup.budget
           ? ["方案费用超出当前预算"]
           : []),
-        ...(plan.totalDistanceKm > walkLimit ? ["预计步行超出双方上限"] : []),
+        ...(!live && plan.totalDistanceKm > walkLimit ? ["预计步行超出双方上限"] : []),
         ...(setup &&
         plan.stops.some(
           (p) => p.startTime < setup.startTime || p.endTime > setup.endTime,
@@ -88,16 +106,68 @@ export function PlanningWorkbench({
     : [];
   const isDone =
     events.some((e) => e.type === "run.completed") && status.state !== "failed";
-  function replace() {
-    if (
-      plan &&
-      active &&
-      store.replaceDemoStop(plan, active.id, reason, note)
-    ) {
+  function closeVeto() {
+    pendingReplan.current?.abort();
+    setReplanning(false);
+    setVeto(false);
+  }
+  async function replace() {
+    if (!base || !plan || !active || pendingReplan.current || locked || !isDone ||
+      store.replanCount >= 2 || !reason) return;
+    setError("");
+    if (!live) {
+      if (!store.replaceDemoStop(plan, active.id, reason, note)) {
+        setError("当前站点已锁定、已替换或已达到两轮调整上限。");
+        return;
+      }
       setVeto(false);
-      setReason("");
-      setNote("");
-    } else setError("当前站点已锁定、已替换或已达到两轮调整上限。");
+      return;
+    }
+    const input = ReplanRequestSchema.safeParse({
+      sessionId: store.sessionId, setup, preferences, plan,
+      lockedStopIds: plan.stops.filter((stop) => stop.locked || store.lockedStops.includes(stop.id)).map((stop) => stop.id),
+      rejectedStopId: active.id,
+      reason: [reason, note.trim()].filter(Boolean).join("，"),
+      reasonCode: vetoReasons.find((item) => item.label === reason)?.code,
+      replanCount: store.replanCount,
+    });
+    if (!input.success) {
+      setError("当前行程无法提交替换，请重新规划后再试。");
+      return;
+    }
+    const controller = new AbortController();
+    pendingReplan.current = controller;
+    setReplanning(true);
+    try {
+      const { events: updates, result } = await requestAgent(input.data, controller.signal);
+      const revised = getCandidates(updates)[0];
+      const diff = result.diff;
+      const replacement = revised?.stops[plan.stops.indexOf(active)];
+      if (!revised || !diff || !replacement || replacement.id === active.id ||
+        revised.stops.length !== plan.stops.length ||
+        diff.replacedStopIds.length !== 1 || diff.replacedStopIds[0] !== active.id ||
+        plan.stops.some((stop, index) => stop.id !== active.id && (
+          !diff.preservedStopIds.includes(stop.id) || revised.stops[index].id !== stop.id ||
+          (input.data.lockedStopIds.includes(stop.id) &&
+            JSON.stringify(revised.stops[index]) !== JSON.stringify(stop))
+        ))) {
+        throw new Error("替换结果不完整，原行程已保留。");
+      }
+      const latest = usePlanningStore.getState();
+      if (controller.signal.aborted || latest.stage !== "workbench" ||
+        latest.sessionId !== input.data.sessionId || latest.liveEvents !== store.liveEvents ||
+        latest.replanCount !== input.data.replanCount) return;
+      store.applyReplan(base.id, revised, {
+        planId: base.id, stopId: active.id, replacementStopId: replacement.id,
+        before: active.name, after: replacement.name, reason, note, diff,
+      });
+      setVeto(false);
+    } catch (error) {
+      if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "替换失败，请重试。");
+    } finally {
+      pendingReplan.current = null;
+      if (!controller.signal.aborted) setReplanning(false);
+    }
   }
   const trace = (
     <aside
@@ -168,15 +238,19 @@ export function PlanningWorkbench({
           <div>
             <CloudRain size={27} />
             <b>
-              {typeof weather.summary.temperatureC === "number"
+              {liveWeather?.temperatureMinC != null && liveWeather.temperatureMaxC != null
+                ? `${liveWeather.temperatureMinC}–${liveWeather.temperatureMaxC}°C`
+                : !live && typeof weather.summary.temperatureC === "number"
                 ? `${weather.summary.temperatureC}°`
                 : "天气"}
               <small>
-                {String(weather.summary.forecast ?? "详见工具结果")}
+                {liveWeather?.maxPrecipitationProbability != null
+                  ? `最高降雨概率 ${liveWeather.maxPrecipitationProbability}%`
+                  : live ? "详见工具结果" : String(weather.summary.forecast ?? "详见工具结果")}
               </small>
             </b>
           </div>
-          <p>来源：{weather.source} · 非实时预报</p>
+          <p>来源：{weather.source} · {live ? "预报随时更新" : "演示天气"}</p>
         </div>
       )}
       {plan && (
@@ -195,7 +269,7 @@ export function PlanningWorkbench({
         <span>
           仅展示工具事件与结果摘要。
           <br />
-          当前为演示运行，不调用真实模型。
+          {live ? "路线、价格与营业时段请在出发前核对。" : "当前为演示运行。"}
         </span>
       </div>
     </aside>
@@ -228,7 +302,7 @@ export function PlanningWorkbench({
           </button>
           <button
             className="button primary"
-            disabled={!plan || !isDone || issues.length > 0}
+            disabled={!plan || !isDone || issues.length > 0 || replanning}
             onClick={() => plan && store.finalize(plan)}
           >
             就是这个，去过周末 <ArrowUpRight size={16} />
@@ -246,9 +320,9 @@ export function PlanningWorkbench({
             </b>
             <p>{status.message}</p>
           </div>
-          {onRetry && (
+          {onRetry && (status.state === "failed" || isDone) && (
             <button className="button secondary" onClick={onRetry}>
-              重新运行演示
+              {live ? "重新规划" : "重新运行演示"}
             </button>
           )}
         </div>
@@ -273,15 +347,16 @@ export function PlanningWorkbench({
               role="tablist"
               aria-label="切换候选方案"
             >
-              {candidates.map((p, i) => {
+              {candidates.map((candidate, i) => {
+                const p = store.revisedPlans[candidate.id] ?? candidate;
                 const Icon = [Leaf, Sun, Coffee][i % 3];
                 return (
                   <button
                     role="tab"
-                    aria-selected={p.id === plan.id}
-                    key={p.id}
+                    aria-selected={candidate.id === base?.id}
+                    key={candidate.id}
                     className={`candidate ${p.id === plan.id ? "selected" : ""} ${["green", "peach", "lavender"][i % 3]}`}
-                    onClick={() => store.selectPlan(p.id)}
+                    onClick={() => store.selectPlan(candidate.id)}
                   >
                     <div className="candidate-art">
                       <span className="plan-letter">
@@ -292,13 +367,13 @@ export function PlanningWorkbench({
                     </div>
                     <div className="candidate-body">
                       <div className="candidate-label">
-                        <span>
+                        {!live && <span>
                           {
                             ["刚刚好的折中", "多一点城市风景", "慢一点也很好"][
                               i % 3
                             ]
                           }
-                        </span>
+                        </span>}
                         {p.id === plan.id ? (
                           <span className="selection-dot">
                             <Check size={11} />
@@ -342,7 +417,7 @@ export function PlanningWorkbench({
               </div>
               <Tag>
                 <ShieldCheck size={12} />
-                {issues.length ? "需要调整条件" : "演示方案"}
+                {issues.length ? "需要调整条件" : live ? (isDone ? "已核对约束" : "规划中") : "演示方案"}
               </Tag>
             </div>
             <div className="route-metrics">
@@ -357,7 +432,7 @@ export function PlanningWorkbench({
                 <Footprints size={16} />
                 <span>
                   <b>{plan.totalDistanceKm} km</b>
-                  <small>预计步行</small>
+                  <small>{live ? "预计总路程" : "预计步行"}</small>
                 </span>
               </div>
               <div>
@@ -371,7 +446,7 @@ export function PlanningWorkbench({
                 <TrainFront size={16} />
                 <span>
                   <b>{plan.transfers} 次</b>
-                  <small>换乘次数</small>
+                  <small>{live ? "预计交通段" : "换乘次数"}</small>
                 </span>
               </div>
             </div>
@@ -440,11 +515,11 @@ export function PlanningWorkbench({
                     {active.tags.map((t) => (
                       <Tag key={t}>{t}</Tag>
                     ))}
-                    <span>演示地点数据</span>
+                    <span>{live ? "上海地点目录" : "演示地点数据"}</span>
                   </div>
                   {store.changes
                     .filter(
-                      (c) => c.planId === plan.id && c.stopId === active.id,
+                      (c) => c.planId === base?.id && (c.replacementStopId ?? c.stopId) === active.id,
                     )
                     .map((change) => (
                       <div className="change-notice" key={change.stopId}>
@@ -452,8 +527,7 @@ export function PlanningWorkbench({
                         <span>
                           <del>{change.before}</del> → {change.after}
                           <br />
-                          保留 {active.startTime}–{active.endTime}
-                          ；其他站点保持不变。
+                          {change.diff?.summary ?? `保留 ${active.startTime}–${active.endTime}，其他站点保持不变。`}
                           <br />
                           原因：{change.reason}
                           {change.note && ` · ${change.note}`}
@@ -476,8 +550,9 @@ export function PlanningWorkbench({
                     <button
                       disabled={
                         locked ||
+                        replanning ||
                         store.replanCount >= 2 ||
-                        store.changes.some((c) => c.stopId === active.id) ||
+                        store.changes.some((c) => (c.replacementStopId ?? c.stopId) === active.id) ||
                         !isDone
                       }
                       onClick={() => {
@@ -494,7 +569,7 @@ export function PlanningWorkbench({
                       aria-label={`${locked ? "解锁" : "锁定"} ${active.name}`}
                       aria-pressed={locked}
                       className={locked ? "locked" : ""}
-                      disabled={active.locked}
+                      disabled={active.locked || replanning}
                       onClick={() => store.toggleLocked(active.id)}
                     >
                       <LockKeyhole size={15} />
@@ -531,24 +606,19 @@ export function PlanningWorkbench({
       <div className="workbench-bottom">
         <span>
           <ShieldCheck size={13} />
-          当前为同区域、等费用的局部替换演示；真实路线重算待接入。
+          {live ? "替换后会重新核对时段、路线和费用。" : "当前为同区域、等费用的局部替换演示。"}
         </span>
-        <span>已调整 {store.replanCount} / 2 次 · 费用来自 Agent 事件</span>
+        <span>已调整 {store.replanCount} / 2 次</span>
       </div>
       {veto && active && (
-        <Modal title="这里，有哪里不合心意？" onClose={() => setVeto(false)}>
+        <Modal title="这里，有哪里不合心意？" onClose={closeVeto}>
           <p>替换「{active.name}」，保留其他地点和已锁定安排。</p>
           <div className="veto-reasons">
-            {[
-              "不感兴趣",
-              "想换一种体验",
-              "担心拥挤或排队",
-              "不符合饮食偏好",
-              "其他原因",
-            ].map((r) => (
+            {vetoReasons.map(({ label: r }) => (
               <button
                 key={r}
                 className={reason === r ? "selected" : ""}
+                disabled={replanning}
                 onClick={() => setReason(r)}
               >
                 {r}
@@ -558,6 +628,7 @@ export function PlanningWorkbench({
           </div>
           <textarea
             aria-label="否决补充说明"
+            disabled={replanning}
             maxLength={60}
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -565,16 +636,16 @@ export function PlanningWorkbench({
           />
           <p className="modal-hint">
             <LockKeyhole size={14} />
-            演示替换保留原时间、费用和坐标，不表示实际地点推荐。
+            {live ? "已锁定站点保持不变，相邻未锁定站点的时间可能调整。" : "演示替换保留原时间、费用和坐标。"}
           </p>
           {error && <p role="alert">{error}</p>}
           <button
             className="button primary"
-            disabled={!reason}
+            disabled={!reason || replanning}
             onClick={replace}
           >
             <WandSparkles size={16} />
-            找一个替代方案
+            {replanning ? "正在查找替代地点…" : "找一个替代方案"}
           </button>
         </Modal>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -15,6 +15,8 @@ import { PreferenceStep } from "@/features/wizard/PreferenceStep";
 import { SetupStep } from "@/features/wizard/SetupStep";
 import { ConsensusStep } from "@/features/wizard/ConsensusStep";
 import { PlanningWorkbench } from "@/features/workbench/PlanningWorkbench";
+import { requestAgent } from "@/features/workbench/agentClient";
+import { PlanRequestSchema, type AgentEvent } from "@/contracts/agent";
 import { FinalItinerary } from "@/features/final/FinalItinerary";
 import { decodeShare } from "@/features/final/share";
 import { usePlanningStore } from "@/state/usePlanningStore";
@@ -24,12 +26,17 @@ export function App() {
   const store = usePlanningStore();
   const { stage, setup, preferences } = store;
   const [modal, setModal] = useState<"help" | "reset" | null>(null);
-  const [runNumber, setRunNumber] = useState(0);
-  const events = useMemo(
-    () => createDemoRun({ runId: `portfolio-demo-${runNumber}` }),
-    [runNumber],
+  const demoEvents = useMemo(
+    () => createDemoRun({ runId: store.mode === "demo" ? store.sessionId ?? "portfolio-demo-0" : "portfolio-demo-0" }),
+    [store.mode, store.sessionId],
   );
-  const [visibleEvents, setVisibleEvents] = useState(events.length);
+  const [visibleEvents, setVisibleEvents] = useState(demoEvents.length);
+  const [liveProgress, setLiveProgress] = useState<AgentEvent[]>([]);
+  const [planError, setPlanError] = useState("");
+  const activePlanRequest = useRef<AbortController | null>(null);
+  const events = store.mode === "demo"
+    ? demoEvents.slice(0, visibleEvents)
+    : store.liveEvents.length ? store.liveEvents : liveProgress;
   const [shared, setShared] = useState<ReturnType<typeof decodeShare>>(null);
   const [shareError, setShareError] = useState("");
   useEffect(() => {
@@ -51,13 +58,42 @@ export function App() {
     return () => window.removeEventListener("hashchange", read);
   }, []);
   useEffect(() => {
-    if (stage !== "workbench" || visibleEvents >= events.length) return;
+    if (stage !== "workbench" || store.mode !== "demo" || visibleEvents >= demoEvents.length) return;
     const timer = setTimeout(() => setVisibleEvents((n) => n + 1), 280);
     return () => clearTimeout(timer);
-  }, [stage, visibleEvents, events.length]);
-  function plan() {
-    store.openWorkbench();
-    setRunNumber((n) => n + 1);
+  }, [stage, store.mode, visibleEvents, demoEvents.length]);
+  useEffect(() => {
+    if (stage !== "workbench" || shared || shareError) activePlanRequest.current?.abort();
+  }, [stage, shared, shareError]);
+  useEffect(() => () => activePlanRequest.current?.abort(), []);
+
+  async function planLive() {
+    if (activePlanRequest.current && !activePlanRequest.current.signal.aborted) return;
+    const sessionId = store.sessionId ?? globalThis.crypto.randomUUID();
+    const input = PlanRequestSchema.safeParse({ sessionId, mode: "live", setup, preferences });
+    store.openWorkbench("live", sessionId);
+    setLiveProgress([]);
+    setPlanError("");
+    if (!input.success) {
+      setPlanError("请先检查日期、时段并完成双方偏好。");
+      return;
+    }
+    const controller = new AbortController();
+    activePlanRequest.current = controller;
+    try {
+      const { events } = await requestAgent(input.data, controller.signal, (event) => {
+        if (!controller.signal.aborted) setLiveProgress((progress) => [...progress, event]);
+      });
+      if (!controller.signal.aborted) usePlanningStore.setState({ liveEvents: events });
+    } catch (error) {
+      if (!controller.signal.aborted) setPlanError(error instanceof Error ? error.message : "规划请求失败，请重试。");
+    } finally {
+      if (activePlanRequest.current === controller) activePlanRequest.current = null;
+    }
+  }
+  function playDemo() {
+    activePlanRequest.current?.abort();
+    store.openWorkbench("demo", globalThis.crypto.randomUUID());
     setVisibleEvents(1);
   }
   function demo() {
@@ -90,7 +126,7 @@ export function App() {
       avoid: ["排队"],
       wish: "想看看街道和夜景，不用赶时间。",
     });
-    plan();
+    playDemo();
   }
   const current =
     stage === "setup"
@@ -128,7 +164,9 @@ export function App() {
         <div className="header-right">
           <span className="demo-pill">
             <span />
-            演示模式
+            {shared ? "只读分享" : stage === "workbench" || stage === "final"
+              ? (store.mode === "live" ? "实时规划" : "演示模式")
+              : "上海 · 双人计划"}
           </span>
           <button
             className="icon-button"
@@ -252,11 +290,17 @@ export function App() {
               onBack={() => store.goTo("person-a")}
             />
           )}{" "}
-          {stage === "consensus" && <ConsensusStep onPlan={plan} />}{" "}
+          {stage === "consensus" && <ConsensusStep onPlan={planLive} />}{" "}
           {stage === "workbench" && (
             <PlanningWorkbench
-              events={events.slice(0, visibleEvents)}
-              onRetry={plan}
+              key={store.sessionId}
+              events={events}
+              mode={store.mode}
+              planError={store.mode === "live" ? planError || (
+                (!activePlanRequest.current || activePlanRequest.current.signal.aborted) && !store.liveEvents.length
+                  ? "上次规划未完成，请重新规划。" : ""
+              ) : undefined}
+              onRetry={store.mode === "live" ? planLive : playDemo}
               onEdit={() => setModal("reset")}
             />
           )}{" "}
@@ -264,6 +308,7 @@ export function App() {
             <FinalItinerary
               plan={store.finalPlan}
               setup={setup}
+              live={store.mode === "live"}
               onBack={() => store.goTo("workbench")}
             />
           )}
@@ -293,8 +338,7 @@ export function App() {
                 <li>确认行程，导出 PNG 或只读分享链接。</li>
               </ol>
               <div className="help-note">
-                当前使用仓库中的演示 Agent
-                事件；地点、天气与费用并未实时核验。偏好仅保存在当前浏览器，私密界面不等同于加密。
+                实时规划会将双方填写的条件提交给规划服务。偏好保存在当前浏览器，分享快照只包含最终行程与公共条件。
               </div>
               <button className="button primary" onClick={() => setModal(null)}>
                 明白了

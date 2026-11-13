@@ -1,6 +1,8 @@
 import type {
+  AgentEvent,
   Itinerary,
   PersonPreferences,
+  PlanDiff,
   PlanSetup,
 } from "@/contracts/agent";
 import { create } from "zustand";
@@ -21,6 +23,8 @@ export type PlanChange = {
   after: string;
   reason: string;
   note: string;
+  replacementStopId?: string;
+  diff?: PlanDiff;
 };
 type PlanningStore = {
   stage: PlanningStage;
@@ -34,11 +38,14 @@ type PlanningStore = {
   changes: PlanChange[];
   replanCount: number;
   finalPlan?: Itinerary;
+  mode: "demo" | "live";
+  sessionId?: string;
+  liveEvents: AgentEvent[];
   saveSetup: (setup: PlanSetup) => void;
   savePreferences: (person: "a" | "b", preferences: PersonPreferences) => void;
   handoffToB: () => void;
   revealConsensus: () => void;
-  openWorkbench: () => void;
+  openWorkbench: (mode: "demo" | "live", sessionId?: string) => void;
   goTo: (stage: PlanningStage) => void;
   selectPlan: (id: string) => void;
   selectStop: (id: string) => void;
@@ -50,6 +57,7 @@ type PlanningStore = {
     reason: string,
     note: string,
   ) => boolean;
+  applyReplan: (baseId: string, plan: Itinerary, change: PlanChange) => void;
   finalize: (plan: Itinerary) => void;
   reset: () => void;
 };
@@ -67,6 +75,9 @@ const initialState = {
   stage: "setup" as const,
   setup: undefined,
   preferences: {},
+  mode: "demo" as const,
+  sessionId: undefined,
+  liveEvents: [] as AgentEvent[],
   ...emptyNegotiation,
 };
 export const usePlanningStore = create<PlanningStore>()(
@@ -74,7 +85,7 @@ export const usePlanningStore = create<PlanningStore>()(
     (set, get) => ({
       ...initialState,
       saveSetup: (setup) =>
-        set({ setup, stage: "person-a", ...emptyNegotiation }),
+        set({ setup, stage: "person-a", sessionId: undefined, liveEvents: [], ...emptyNegotiation }),
       savePreferences: (person, preferences) =>
         set((state) => ({
           preferences: { ...state.preferences, [person]: preferences },
@@ -82,7 +93,8 @@ export const usePlanningStore = create<PlanningStore>()(
         })),
       handoffToB: () => set({ stage: "person-b" }),
       revealConsensus: () => set({ stage: "consensus" }),
-      openWorkbench: () => set({ stage: "workbench", ...emptyNegotiation }),
+      openWorkbench: (mode, sessionId) =>
+        set({ stage: "workbench", mode, sessionId, liveEvents: [], ...emptyNegotiation }),
       goTo: (stage) => set({ stage }),
       selectPlan: (id) => set({ activePlanId: id, activeStopId: undefined }),
       selectStop: (id) => set({ activeStopId: id }),
@@ -147,6 +159,14 @@ export const usePlanningStore = create<PlanningStore>()(
         });
         return true;
       },
+      applyReplan: (baseId, plan, change) =>
+        set((state) => ({
+          revisedPlans: { ...state.revisedPlans, [baseId]: plan },
+          changes: [...state.changes, change],
+          activeStopId: change.replacementStopId,
+          likedStops: state.likedStops.filter((id) => id !== change.stopId),
+          replanCount: state.replanCount + 1,
+        })),
       finalize: (plan) =>
         set((state) => ({
           stage: "final",
@@ -174,6 +194,9 @@ export const usePlanningStore = create<PlanningStore>()(
         changes,
         replanCount,
         finalPlan,
+        mode,
+        sessionId,
+        liveEvents,
       }) => ({
         stage,
         setup,
@@ -186,6 +209,9 @@ export const usePlanningStore = create<PlanningStore>()(
         changes,
         replanCount,
         finalPlan,
+        mode,
+        sessionId,
+        liveEvents,
       }),
     },
   ),

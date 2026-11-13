@@ -32,7 +32,7 @@ export function decodeShare(hash: string) {
     throw new Error("分享快照无法读取，请索取新的链接。");
   }
 }
-export async function exportItinerary(plan: Itinerary, setup?: PlanSetup) {
+export async function exportItinerary(plan: Itinerary, setup?: PlanSetup, live = false) {
   const canvas = document.createElement("canvas");
   canvas.width = 1000;
   canvas.height = 650 + plan.stops.length * 190;
@@ -57,7 +57,7 @@ export async function exportItinerary(plan: Itinerary, setup?: PlanSetup) {
   ctx.fillStyle = "#354e44";
   ctx.font = "26px sans-serif";
   ctx.fillText(
-    `预计 ¥${plan.totalCost} / 两人 · 步行 ${plan.totalDistanceKm} km`,
+    `预计 ¥${plan.totalCost} / 两人 · 路程 ${plan.totalDistanceKm} km`,
     65,
     370,
   );
@@ -90,7 +90,7 @@ export async function exportItinerary(plan: Itinerary, setup?: PlanSetup) {
   ctx.fillStyle = "#87937c";
   ctx.font = "20px sans-serif";
   ctx.fillText(
-    "演示行程 · 地点、价格及天气为预设数据",
+    live ? "地点资料与费用为估算，请在出发前核实。" : "演示行程 · 地点、价格及天气为预设数据",
     65,
     canvas.height - 100,
   );

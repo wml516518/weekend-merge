@@ -17,7 +17,7 @@ flowchart LR
   Local --> Events
 ```
 
-浏览器当前直接读取 `createDemoRun()`，未调用图中的 HTTP 端点。两个端点先用 `src/contracts/agent.ts` 中的 Zod Schema 校验 HTTP 请求：无效 JSON 或请求字段会在进入状态机前收到 HTTP 400 JSON 错误，不产生事件。已进入状态机后的运行失败才以 `run.failed` 事件结束。成功响应为 `application/x-ndjson`，每行一个事件，最后恰好一个 `run.completed` 或 `run.failed`。`plan` 使用 `ReadableStream` 和可选事件 sink，在模型仍等待时发送 `run.started` 与早期进度；`runPlanningAgent` 同时保留数组返回接口。每条事件在原对象描述符、JSON 安全、Schema 和实际序列化行四层检查后入队。异常在尚未终止时补一个脱敏 `run.failed` 并关闭，已终止后不再发送。`replan` 仍返回有界的缓冲 NDJSON。
+浏览器在共识页发起实时规划，工作台通过同源 HTTP 调用规划与重排接口。首页快速体验直接读取 `createDemoRun()`。两个端点先用 `src/contracts/agent.ts` 中的 Zod Schema 校验 HTTP 请求：无效 JSON 或请求字段会在进入状态机前收到 HTTP 400 JSON 错误，不产生事件。已进入状态机后的运行失败才以 `run.failed` 事件结束。成功响应为 `application/x-ndjson`，每行一个事件，最后恰好一个 `run.completed` 或 `run.failed`。`plan` 使用 `ReadableStream` 和可选事件 sink，在模型仍等待时发送 `run.started` 与早期进度；`runPlanningAgent` 同时保留数组返回接口。每条事件在原对象描述符、JSON 安全、Schema 和实际序列化行四层检查后入队。异常在尚未终止时补一个脱敏 `run.failed` 并关闭，已终止后不再发送。`replan` 仍返回有界的缓冲 NDJSON。
 
 HTTP 先逐块读取并限制实际 UTF-8 请求体为 32 KiB（`413 REQUEST_TOO_LARGE`），再 JSON/静态字段校验，再检查上海今天至 +180 天的移动日期窗口。共享设定仅接受周末、3–12 小时和上海区域白名单；偏好字符串/数组有上限。实时 `plan` 最后在模型创建和所有外部工具调用之前检查模块级限流：可信 Netlify IP + `sessionId` 每十分钟五次、最多 5,000 个键，清除过期或最早记录。演示绕过额度。`429 RATE_LIMITED` 标记可重试；时钟与限流器均可注入。它只保护当前 warm instance，重启、不同实例和更换会话不共享额度；持久分布式强制执行不在本 MVP 范围。
 

@@ -2,9 +2,10 @@ import { fileURLToPath, URL } from "node:url";
 
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { localFunctions } from "./scripts/local-functions";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), localFunctions()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

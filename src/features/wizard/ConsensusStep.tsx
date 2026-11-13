@@ -99,7 +99,7 @@ export function ConsensusStep({ onPlan }: { onPlan: () => void }) {
       <div className="consensus-actions">
         <span>
           <LockKeyhole size={14} />
-          当前提供演示提案；真实个性化规划待 Agent 接入
+          开始规划后，双方的条件将用于生成候选行程
         </span>
         <button className="button primary" onClick={onPlan}>
           <WandSparkles size={17} />

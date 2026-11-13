@@ -45,7 +45,7 @@ export function RouteMap({
         className="city-map"
         viewBox="0 0 680 490"
         role="img"
-        aria-label="演示路线示意图，可点击站点序号"
+        aria-label="路线示意图，可点击站点序号"
       >
         <defs>
           <pattern
