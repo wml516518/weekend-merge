@@ -4,6 +4,7 @@ import { ItinerarySchema, type PlanRequest } from "../../../../src/contracts/age
 import { calculateBudget } from "./budget";
 import { CalculateBudgetInputSchema, EstimateRouteInputSchema, SearchPlacesInputSchema, type Place } from "./contracts";
 import { searchPlaces, shanghaiPlaces } from "./places";
+import { parsePlaceSearchInput } from "./placeSearchInput";
 import { estimateRoute } from "./route";
 import { validatePlan } from "./validator";
 import { WeatherInputSchema, createWeatherTool, type WeatherInput, type WeatherOutput } from "./weather";
@@ -62,7 +63,7 @@ export function createAgentTools(config: {
       WeatherInputSchema.parse(input);
       return weather(weatherScopeForRequest(config.request));
     },
-    search_places: (input) => searchPlaces(SearchPlacesInputSchema.parse(input), places),
+    search_places: (input) => searchPlaces(parsePlaceSearchInput(input, config.request.setup.date), places),
     estimate_route: (input) => estimateRoute(EstimateRouteInputSchema.parse(input)),
     calculate_budget: (input) => calculateBudget(CalculateBudgetInputSchema.parse(input)),
     validate_plan: (input) => validatePlan({

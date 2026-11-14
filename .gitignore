@@ -10,3 +10,4 @@ output/
 .worktrees/
 *.tsbuildinfo
 .DS_Store
+.deploy/

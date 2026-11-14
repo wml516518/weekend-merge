@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,3 +30,94 @@ jobs:
 
       - name: Build production app
         run: npm run build
+
+      - name: Verify real PM2 activation and rollback
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pm2-tools" --no-save --package-lock=false pm2@6.0.14
+          PATH="$RUNNER_TEMP/pm2-tools/node_modules/.bin:$PATH" node scripts/verify-deploy.mjs
+
+      - name: Package server release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          tar -czf weekend-merge.tgz \
+            dist dist-server scripts/deploy.mjs tests/fixtures/plan-request.demo.json
+
+      - name: Upload verified release
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-release
+          path: weekend-merge.tgz
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to Alibaba Cloud
+    needs: verify
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: weekend-merge-production
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+    steps:
+      - name: Checkout deployment revision
+        uses: actions/checkout@v4
+
+      - name: Download verified release
+        uses: actions/download-artifact@v4
+        with:
+          name: server-release
+
+      - name: Check target and configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9/_-]+$ && "$DEPLOY_PATH" != / ]]
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/deploy_known_hosts"
+
+      - name: Transfer and activate release
+        env:
+          RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          # An old workflow rerun must not replace a newer main revision.
+          latest=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [[ "$latest" != "$GITHUB_SHA" ]]; then
+            echo "Skipping superseded main revision."
+            exit 0
+          fi
+          ssh_options=(-i "$RUNNER_TEMP/deploy_key" -o BatchMode=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/deploy_known_hosts")
+          scp "${ssh_options[@]}" -P "$DEPLOY_PORT" weekend-merge.tgz \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.deploy/uploads/$RELEASE_ID.tgz"
+          ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$DEPLOY_PATH' '$RELEASE_ID'" <<'REMOTE'
+          set -euo pipefail
+          root=$1
+          release=$2
+          test -x "$root/.deploy/run-node"
+          upload="$root/.deploy/uploads/$release"
+          mkdir "$upload"
+          tar -xzf "$root/.deploy/uploads/$release.tgz" -C "$upload" --no-same-owner --no-same-permissions
+          "$root/.deploy/run-node" "$upload/scripts/deploy.mjs" "$root" "$release"
+          REMOTE
+
+      - name: Remove runner SSH material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/deploy_known_hosts"

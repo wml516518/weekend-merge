@@ -2,7 +2,7 @@
 
 一个面向两人周末决策的可观察 AI Agent。双方分别填写兴趣、预算和雷区，系统通过天气、地点、路线与预算工具生成三套折中方案；否决某一站后，只重新规划受影响区段。
 
-- [在线演示](https://weekend-merge-wml516518.netlify.app)
+- [在线演示](https://weekendmerge.ailoong.net.cn/)
 - [个人主页中的项目介绍](https://menglong-build-log.netlify.app/#projects)
 
 ## 当前可用
@@ -55,6 +55,8 @@ npm run build
 `DEEPSEEK_API_KEY` 与 `DEEPSEEK_MODEL` 只应配置为 Netlify Functions 的服务端环境变量，不能使用 `VITE_` 前缀。没有密钥时生产站仍可运行，并会明确降级到确定性规则规划；添加密钥后启用 DeepSeek Tool Calls。基础响应安全头由 `netlify.toml` 统一设置，CSP 将在地图瓦片来源确定后单独收紧。
 
 ## 自有服务器部署
+
+仓库提供 GitHub Actions 到阿里云的自动部署流程。完成服务器授权并启用后，`main` 测试、构建通过就会上传产物，检查新版本和 API，失败自动恢复旧进程。服务器准备、GitHub Secrets 和启用步骤见 [自动部署说明](docs/DEPLOYMENT.md)。
 
 仓库内置 Node 服务器入口，同时托管 Vite 静态产物和两个 API handler，保留前端已使用的 `/.netlify/functions/plan` 与 `/.netlify/functions/replan` 路径：
 
@@ -112,6 +114,8 @@ Cloudflare 把子域 A/AAAA/CNAME 记录指向服务器并开启代理即可；S
 
 五个白名单工具是 `get_weather`、`search_places`、`estimate_route`、`calculate_budget`、`validate_plan`。天气范围由服务端依据请求日期/时间固定为上海人民广场坐标；地点资料和路线、费用是静态数据或估算，不是实时营业、交通或票价信息。出发前应核对地点营业时间、票价和路线。详见 [架构](docs/ARCHITECTURE.md)。
 
+模型工具的时间参数要求带秒和时区的 ISO 日期时间。地点搜索还兼容 `13:00` 和未携带时区的本地日期时间：服务端按请求日期及上海 `+08:00` 补全，再校验日期和区间；倒序、超过一天及无法解释的时间仍拒绝，不会丢弃过滤条件。
+
 工具事件仅公开白名单摘要：上海天气区间/温度/降雨范围、目录地点 ID/名称/核实日期、路线/步行/费用范围，以及按候选 ID 标记的验证/陈旧数据警告；不返回原始工具输出、自由文本偏好、提示词、API 错误或隐藏推理。`run.failed.constraintCodes` 可携带封闭枚举中的时间、预算、避让等无方案原因。
 
 成功响应的事件类型为 `run.started`、`step.started`、`tool.completed` / `tool.failed`、`plan.proposed`、`run.degraded`，并以一个 `run.completed` 或 `run.failed` 结束。初始规划完成事件的 `candidateIds` 有三个元素，没有 `diff`；重排完成事件的 `candidateIds` 有一个元素和必需的 `diff`。展示 fixture 中的候选地点并非全都收录于服务端目录，因此不能直接拿 `createDemoRun()` 的方案提交给重排接口。
@@ -120,6 +124,7 @@ Cloudflare 把子域 A/AAAA/CNAME 记录指向服务器并开启代理即可；S
 
 - [架构与降级路径](docs/ARCHITECTURE.md)
 - [本地 API 演示](docs/DEMO.md)
+- [服务器自动部署](docs/DEPLOYMENT.md)
 - [产品需求与系统设计](docs/PRD.md)
 - [前端设计、模块入口与接入边界](docs/FRONTEND.md)
 - [Agent 事件契约](src/contracts/agent.ts)

@@ -163,6 +163,42 @@ describe("controlled planning orchestrator", () => {
   });
 
   it.each([
+    ["clock times", "11:00", "14:00"],
+    ["local datetimes", "2026-11-14T11:00:00", "2026-11-14T14:00:00"],
+    ["local datetimes without seconds", "2026-11-14T11:00", "2026-11-14T14:00"],
+    ["space-separated datetimes", "2026-11-14 11:00", "2026-11-14 14:00"],
+    ["explicit UTC", "2026-11-14T03:00:00Z", "2026-11-14T06:00:00Z"],
+  ])("continues to weather and final proposals after a place search using %s", async (_label, start, end) => {
+    const script = scripted([{ type: "tool_calls", calls: [
+      { id: "places-time", name: "search_places", args: { openBetween: { start, end } } },
+      weatherCall,
+    ] }, final]);
+    const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
+    expect(script.inputs).toHaveLength(2);
+    expect(script.inputs[1].toolResults[0]).toMatchObject({ name: "search_places", output: {
+      places: [{ placeId: "venue-0" }, { placeId: "venue-1" }, { placeId: "venue-2" }, { placeId: "venue-3" }],
+    } });
+    expect(events).toContainEqual(expect.objectContaining({ type: "tool.completed", tool: "get_weather", source: "open-meteo" }));
+    expect(events.some((event) => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events)).toHaveLength(3);
+    expect(events.at(-1)?.type).toBe("run.completed");
+  });
+
+  it.each([
+    ["invalid clock", "25:00", "26:00"],
+    ["reversed interval", "14:00", "11:00"],
+    ["invalid calendar date", "2026-11-31T11:00", "2026-11-31T14:00"],
+    ["unparseable text", "tomorrow afternoon", "after dinner"],
+    ["overlong interval", "2026-11-14T11:00", "2026-11-16T14:00"],
+  ])("still rejects a place search with %s", async (_label, start, end) => {
+    const script = scripted([{ type: "tool_call", id: "bad-time", name: "search_places", args: { openBetween: { start, end } } }]);
+    const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
+    expect(events).toContainEqual({ type: "tool.failed", tool: "search_places", code: "INVALID_TOOL_ARGUMENTS", retryable: false });
+    expect(script.inputs).toHaveLength(1);
+    expect(events).toContainEqual({ type: "run.degraded", reason: "INVALID_TOOL_ARGUMENTS", fallback: "rule-planner" });
+  });
+
+  it.each([
     ["shell", {}, "UNKNOWN_TOOL", "unknown"],
     ["toString", {}, "UNKNOWN_TOOL", "unknown"],
     ["estimate_route", { stops: [] }, "INVALID_TOOL_ARGUMENTS"],
