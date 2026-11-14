@@ -60,6 +60,7 @@ describe("DeepSeek server adapter", () => {
       response_format: { type: "json_object" },
     });
     expect(requests[1].body.tools).toBeUndefined();
+    expect(JSON.stringify(requests[0].body.messages)).toContain("combined setup budget is a hard limit");
     expect(requests[1].body.messages).toEqual([
       expect.objectContaining({ role: "system" }),
       expect.objectContaining({ role: "user" }),

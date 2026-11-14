@@ -102,6 +102,7 @@ const systemInstructionBase = [
   "The second and third requests must return only final JSON, with three distinct venue combinations and unique plan and stop IDs. If validation feedback is supplied, correct every listed issue.",
   "Two plans are distinct only when their unordered sets of placeId values differ. Different ordering, plan IDs or stop IDs do not make a duplicate count. Before the final answer, compare every pair of plans and replace any repeated venue set using places returned by the tools.",
   "Each plan has at least two stops. Leave time for estimated travel; venue costs cover the actual participant count, transit allowance is 4 yuan per participant per transit leg, and buffer is 10%.",
+  "The combined setup budget is a hard limit. Before returning JSON, calculate every plan as venue maximum price × participant count, plus 4 yuan × participant count for every transit leg, plus 10% buffer. If a plan exceeds it, replace paid stops with free or cheaper returned venues; prefer exactly two stops when the budget is tight rather than combining three paid venues.",
   "Never claim live fares, exact routing, or weather that was not returned by a tool. Application code recomputes all totals and validates proposals.",
   `The final JSON must match this schema: ${JSON.stringify(finalSchema)}`,
 ].join("\n");
