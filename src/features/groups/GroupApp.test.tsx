@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import type { GroupView } from "@/contracts/groups";
 import { createDemoRun } from "@/demo/demoRun";
 import { getCandidates } from "@/features/workbench/events";
@@ -850,7 +851,7 @@ it("surfaces expired group status and disables its editing and management action
   await user.click(
     await screen.findByRole("button", { name: "打开 梧桐周末" }),
   );
-  expect(screen.getByText(/计划已过期/)).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("计划已过期");
   expect(
     screen.queryByRole("button", { name: "填写我的偏好" }),
   ).not.toBeInTheDocument();
@@ -891,4 +892,234 @@ it("does not let a visibility poll discard an in-flight save and resumes polling
   expect(
     screen.getByRole("heading", { name: "服务器改名" }),
   ).toBeInTheDocument();
+});
+
+it.each(["rotation", "manual refresh"] as const)(
+  "keeps group, identity and URL aligned after a delayed %s response",
+  async (operation) => {
+    const first = current;
+    const second = group({
+      id: "g2",
+      name: "另一组",
+      myMembers: [
+        {
+          id: "m9",
+          nickname: "阿九",
+          owner: false,
+          submitted: false,
+          version: 0,
+        },
+      ],
+      members: [{ id: "m9", nickname: "阿九", owner: false, submitted: false }],
+    });
+    groups.push(second);
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let delayRefresh = false;
+    let release!: (value: Response) => void;
+    vi.mocked(fetch).mockImplementation((path, options) => {
+      if (path === "/api/groups/g2")
+        return Promise.resolve(Response.json(second));
+      if (path.endsWith("/invite"))
+        return operation === "rotation"
+          ? new Promise((resolve) => {
+              release = resolve;
+            })
+          : Promise.resolve(
+              Response.json(
+                { error: { code: "RATE_LIMITED", message: "请稍后重试。" } },
+                { status: 429 },
+              ),
+            );
+      if (path === "/api/groups/g1" && delayRefresh)
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      return original(path, options);
+    });
+    const user = userEvent.setup();
+    render(<GroupApp />);
+    await user.click(
+      await screen.findByRole("button", { name: "打开 梧桐周末" }),
+    );
+    await user.click(screen.getByRole("button", { name: "更新邀请链接" }));
+    if (operation === "manual refresh") {
+      delayRefresh = true;
+      await user.click(screen.getByRole("button", { name: "刷新计划状态" }));
+    }
+    await user.click(screen.getByRole("button", { name: "我的计划" }));
+    await user.click(
+      await screen.findByRole("button", { name: "打开 另一组" }),
+    );
+    await act(async () => {
+      release(
+        Response.json(
+          operation === "rotation"
+            ? { group: first, inviteToken: "STALE" }
+            : first,
+        ),
+      );
+    });
+    expect(screen.getByRole("heading", { name: "另一组" })).toBeInTheDocument();
+    expect(screen.getByText(/当前身份：阿九/)).toBeInTheDocument();
+    expect(location.hash).toBe("#group=g2");
+    expect(
+      screen.queryByRole("heading", { name: "梧桐周末" }),
+    ).not.toBeInTheDocument();
+  },
+);
+
+it.each(["recover", "create", "join"] as const)(
+  "ignores a delayed %s navigation completion after choosing a different group",
+  async (operation) => {
+    const first = current;
+    const second = group({ id: "g2", name: "另一组" });
+    groups.push(second);
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let release!: (value: Response) => void;
+    const pathToDelay =
+      operation === "create" ? "/api/groups" : `/api/groups/${operation}`;
+    vi.mocked(fetch).mockImplementation((path, options) => {
+      if (path === pathToDelay && options?.method === "POST")
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      if (path === "/api/groups/g2")
+        return Promise.resolve(Response.json(second));
+      return original(path, options);
+    });
+    if (operation !== "create")
+      history.replaceState(
+        null,
+        "",
+        operation === "recover" ? "/#recover=OWNER" : "/#invite=INVITE",
+      );
+    const user = userEvent.setup();
+    render(<GroupApp />);
+    if (operation === "create") {
+      await user.type(screen.getByLabelText("计划名称"), "新建组");
+      await user.type(screen.getByLabelText("我的昵称"), "小林");
+      await user.click(screen.getByRole("button", { name: "创建并邀请" }));
+    }
+    if (operation === "join") {
+      await user.type(screen.getByLabelText("加入昵称"), "小林");
+      await user.click(screen.getByRole("button", { name: "加入计划" }));
+    }
+    await user.click(screen.getByRole("button", { name: "我的计划" }));
+    await user.click(
+      await screen.findByRole("button", { name: "打开 另一组" }),
+    );
+    await act(async () => {
+      release(
+        Response.json(
+          operation === "recover"
+            ? first
+            : {
+                group: first,
+                memberId: "m1",
+                inviteToken: "INVITE",
+                memberRecoveryToken: "PERSONAL",
+                ownerRecoveryToken: "OWNER",
+              },
+        ),
+      );
+    });
+    expect(screen.getByRole("heading", { name: "另一组" })).toBeInTheDocument();
+    expect(location.hash).toBe("#group=g2");
+  },
+);
+
+it.each(["queued", "running", "ready", "finalized"] as const)(
+  "marks invitations invalid in %s and hides stale invite credentials",
+  async (state) => {
+    vi.useFakeTimers();
+    groups = [];
+    render(<GroupApp />);
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText("计划名称"), {
+      target: { value: "梧桐周末" },
+    });
+    fireEvent.change(screen.getByLabelText("我的昵称"), {
+      target: { value: "小林" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "创建并邀请" }));
+    });
+    expect(screen.getByLabelText("邀请链接")).toBeInTheDocument();
+    current = { ...current, state };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(screen.getByText(/邀请已失效：本轮已进入规划/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/开启新一轮收集后，需更新有效邀请链接/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "更新邀请链接" })).toBeDisabled();
+    expect(screen.queryByLabelText("邀请链接")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("我的恢复链接")).toBeInTheDocument();
+  },
+);
+
+it("marks a collecting invitation expired at its seven-day deadline", async () => {
+  current = group({
+    createdAt: Date.now() - 8 * 86400000,
+    inviteExpiresAt: Date.now() - 86400000,
+  });
+  groups = [current];
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.click(
+    await screen.findByRole("button", { name: "打开 梧桐周末" }),
+  );
+  expect(screen.getByText(/邀请已过期：已超过七天有效期/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "更新邀请链接" })).toBeDisabled();
+  expect(screen.queryByText(/邀请有效至/)).not.toBeInTheDocument();
+});
+
+it("retains static-catalog freshness disclosure for an already finalized group", async () => {
+  const candidates = getCandidates(createDemoRun({ runId: "final-source" }));
+  current = group({
+    state: "finalized",
+    candidates,
+    finalPlanId: candidates[0].id,
+  });
+  groups = [current];
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.click(
+    await screen.findByRole("button", { name: "打开 梧桐周末" }),
+  );
+  expect(screen.getByText(/地点来自静态上海精选目录/)).toBeInTheDocument();
+});
+
+it("completes a single recovery exchange through the application StrictMode effect replay", async () => {
+  history.replaceState(null, "", "/#recover=OWNER");
+  render(
+    <StrictMode>
+      <GroupApp />
+    </StrictMode>,
+  );
+  expect(
+    await screen.findByRole("heading", { name: "梧桐周末" }),
+  ).toBeInTheDocument();
+  expect(writes.filter((w) => w.path === "/api/groups/recover")).toHaveLength(
+    1,
+  );
+  expect(location.hash).toBe("#group=g1");
+});
+
+it("requires a new valid rotation after a new round without extending the seven-day deadline", async () => {
+  groups = [];
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.type(screen.getByLabelText("计划名称"), "梧桐周末");
+  await user.type(screen.getByLabelText("我的昵称"), "小林");
+  await user.click(screen.getByRole("button", { name: "创建并邀请" }));
+  await user.click(screen.getByRole("button", { name: "开启新一轮" }));
+  await user.click(screen.getByRole("button", { name: "确认开启新一轮" }));
+  expect(screen.queryByLabelText("邀请链接")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "更新邀请链接" })).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "更新邀请链接" }));
+  expect(
+    (screen.getByLabelText("邀请链接") as HTMLInputElement).value,
+  ).toContain("#invite=ROTATED");
 });

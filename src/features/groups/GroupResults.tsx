@@ -62,6 +62,11 @@ export function GroupResults({
         ? consensus
         : undefined;
   const editable = group.canManage && group.state === "ready" && !busy;
+  const catalogDisclosure = (
+    <p>
+      地点来自静态上海精选目录，营业时间与票价须出发前核实；路线、步行距离和费用为估算，非实时导航。
+    </p>
+  );
   const events = group.job && (
     <section className="group-events" aria-label="持久规划事件">
       <h2>一起等一个好周末</h2>
@@ -88,6 +93,7 @@ export function GroupResults({
     return (
       <section className="group-results">
         {events}
+        {catalogDisclosure}
         <FinalItinerary
           plan={{
             ...final,
@@ -151,9 +157,7 @@ export function GroupResults({
             <h2>三个周末提案</h2>
             <span>已调整 {group.replanCount} / 2 次</span>
           </div>
-          <p>
-            地点来自静态上海精选目录，营业时间与票价须出发前核实；路线、步行距离和费用为估算，非实时导航。
-          </p>
+          {catalogDisclosure}
           <div className="group-candidates">
             {group.candidates.map((plan) => (
               <article

@@ -48,6 +48,9 @@ export function GroupLobby({
   const [conflict, setConflict] = useState(false);
   const canEdit = group.state === "collecting" && !!mine && !expired;
   const submitted = group.members.filter((m) => m.submitted).length;
+  const inviteDeadlinePassed = Date.now() >= group.createdAt + 7 * 86400000;
+  const canRotateInvite =
+    group.state === "collecting" && !expired && !inviteDeadlinePassed;
   async function save(preferences: PersonPreferences, submit: boolean) {
     if (!mine) return;
     const saved = await mutate(() =>
@@ -111,14 +114,27 @@ export function GroupLobby({
           <p className="group-muted">
             计划有效至 {new Date(group.expiresAt).toLocaleString("zh-CN")}
             <br />
-            邀请有效至 {new Date(group.inviteExpiresAt).toLocaleString("zh-CN")}
+            {group.state !== "collecting"
+              ? "邀请已失效：本轮已进入规划。"
+              : inviteDeadlinePassed
+                ? "邀请已过期：已超过七天有效期，请创建新计划邀请成员。"
+                : expired
+                  ? "邀请已失效：计划已过期。"
+                  : Date.now() >= group.inviteExpiresAt
+                    ? "本轮邀请已失效，请更新邀请链接。"
+                    : `邀请有效至 ${new Date(group.inviteExpiresAt).toLocaleString("zh-CN")}`}
           </p>
+          {group.state !== "collecting" && (
+            <p className="group-muted">
+              开启新一轮收集后，需更新有效邀请链接才能加入新成员；邀请截止仍为计划创建后的七天，超过截止请创建新计划。
+            </p>
+          )}
           <div className="group-actions">
             {group.canManage && (
               <>
                 <button
                   className="button secondary"
-                  disabled={busy || expired}
+                  disabled={busy || !canRotateInvite}
                   onClick={rotate}
                 >
                   更新邀请链接

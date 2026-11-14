@@ -17,6 +17,7 @@ function readEntry(): Entry {
 }
 type IssuedLinks = {
   invite?: string;
+  inviteRevision?: number;
   personal?: Record<string, string>;
   owner?: string;
 };
@@ -38,19 +39,37 @@ export function GroupApp() {
   const [handoff, setHandoff] = useState(false);
   const [issued, setIssued] = useState<Record<string, IssuedLinks>>({});
   const requestVersion = useRef(0);
+  const navigationVersion = useRef(0);
+  const actionVersion = useRef(0);
+  const listVersion = useRef(0);
   const mounted = useRef(true);
   const exchanged = useRef<string>("");
   const mutating = useRef(false);
   const pollAbort = useRef<AbortController | null>(null);
   const loadList = useCallback(async (signal?: AbortSignal) => {
+    const version = ++listVersion.current;
     try {
       const result = await groupClient.list(signal);
-      if (!signal?.aborted && mounted.current) setGroups(result.groups);
+      if (
+        !signal?.aborted &&
+        mounted.current &&
+        listVersion.current === version
+      )
+        setGroups(result.groups);
     } catch (e) {
-      if (!signal?.aborted && mounted.current)
+      if (
+        !signal?.aborted &&
+        mounted.current &&
+        listVersion.current === version
+      )
         setError(e instanceof Error ? e.message : "无法读取我的计划。");
     } finally {
-      if (!signal?.aborted && mounted.current) setLoading(false);
+      if (
+        !signal?.aborted &&
+        mounted.current &&
+        listVersion.current === version
+      )
+        setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -59,13 +78,30 @@ export function GroupApp() {
     void loadList(controller.signal);
     return () => {
       mounted.current = false;
-      requestVersion.current++;
       controller.abort();
     };
   }, [loadList]);
-  function open(value: GroupView, ownMemberId?: string) {
+  function leaveContext() {
+    navigationVersion.current++;
+    actionVersion.current++;
     requestVersion.current++;
     pollAbort.current?.abort();
+    mutating.current = false;
+    setBusy(false);
+  }
+  function home() {
+    leaveContext();
+    activeRef.current = "";
+    setActiveId("");
+    setGroup(undefined);
+    setEntry(null);
+    setHandoff(false);
+    setError("");
+    history.replaceState(null, "", location.pathname);
+    void loadList();
+  }
+  function open(value: GroupView, ownMemberId?: string) {
+    leaveContext();
     activeRef.current = value.id;
     setActiveId(value.id);
     setGroup(value);
@@ -86,29 +122,26 @@ export function GroupApp() {
       history.replaceState(null, "", location.pathname + location.search);
     if (entry.kind !== "recover" || exchanged.current === entry.token) return;
     exchanged.current = entry.token;
-    setBusy(true);
-    setError("");
-    void groupClient
-      .recover(entry.token)
-      .then((value) => {
-        if (mounted.current) open(value);
-      })
-      .catch((e) => {
-        if (mounted.current) {
-          setError(e instanceof Error ? e.message : "恢复失败。");
-          setEntry(null);
-        }
-      })
-      .finally(() => {
-        if (mounted.current) setBusy(false);
-      });
+    void action(
+      async (current) => {
+        const value = await groupClient.recover(entry.token);
+        if (current()) open(value);
+      },
+      () => setEntry(null),
+    );
   }, [entry]);
   useEffect(() => {
     const listener = () => {
       const next = readEntry();
+      leaveContext();
       setEntry(next);
       if (next?.kind === "group") {
+        activeRef.current = next.token;
         setActiveId(next.token);
+        setGroup(undefined);
+      } else {
+        activeRef.current = "";
+        setActiveId("");
         setGroup(undefined);
       }
     };
@@ -168,25 +201,45 @@ export function GroupApp() {
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [activeId]);
-  async function action(operation: () => Promise<void>) {
-    if (busy) return;
+  async function action(
+    operation: (current: () => boolean) => Promise<void>,
+    onFailure?: () => void,
+  ) {
+    if (mutating.current) return;
+    const sourceId = activeRef.current;
+    const navigation = navigationVersion.current;
+    const version = ++requestVersion.current;
+    const operationVersion = ++actionVersion.current;
+    pollAbort.current?.abort();
+    const current = () =>
+      mounted.current &&
+      activeRef.current === sourceId &&
+      navigationVersion.current === navigation &&
+      requestVersion.current === version &&
+      actionVersion.current === operationVersion;
     setBusy(true);
     mutating.current = true;
     setError("");
     setMessage("");
     try {
-      await operation();
+      await operation(current);
     } catch (e) {
-      if (mounted.current)
+      if (current()) {
         setError(e instanceof Error ? e.message : "请求失败，请重试。");
+        onFailure?.();
+      }
     } finally {
-      mutating.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current && actionVersion.current === operationVersion) {
+        mutating.current = false;
+        setBusy(false);
+      }
     }
   }
   async function mutate(operation: () => Promise<GroupView>) {
-    if (busy) return false;
+    if (mutating.current) return false;
     const sourceId = activeRef.current;
+    const navigation = navigationVersion.current;
+    const operationVersion = ++actionVersion.current;
     const version = ++requestVersion.current;
     pollAbort.current?.abort();
     setBusy(true);
@@ -197,6 +250,8 @@ export function GroupApp() {
       if (
         mounted.current &&
         activeRef.current === sourceId &&
+        navigationVersion.current === navigation &&
+        actionVersion.current === operationVersion &&
         requestVersion.current === version
       ) {
         setGroup(value);
@@ -205,7 +260,12 @@ export function GroupApp() {
       }
       return false;
     } catch (e) {
-      if (mounted.current && activeRef.current === sourceId)
+      if (
+        mounted.current &&
+        activeRef.current === sourceId &&
+        navigationVersion.current === navigation &&
+        actionVersion.current === operationVersion
+      )
         setError(
           e instanceof GroupApiError
             ? `${e.message}${e.code === "VERSION_CONFLICT" ? " 请同步服务器内容后重试。" : ""}`
@@ -215,8 +275,10 @@ export function GroupApp() {
         );
       return false;
     } finally {
-      mutating.current = false;
-      if (mounted.current) setBusy(false);
+      if (mounted.current && actionVersion.current === operationVersion) {
+        mutating.current = false;
+        setBusy(false);
+      }
     }
   }
   function remember(groupId: string, value: IssuedLinks) {
@@ -230,14 +292,27 @@ export function GroupApp() {
     }));
   }
   const links = group ? (issued[group.id] ?? {}) : {};
+  const inviteValid =
+    !!group &&
+    group.state === "collecting" &&
+    Date.now() < group.expiresAt &&
+    Date.now() < group.inviteExpiresAt &&
+    links.inviteRevision === group.revision;
   const joinToken =
-    entry?.kind === "invite" ? entry.token : handoff ? links.invite : undefined;
+    entry?.kind === "invite"
+      ? entry.token
+      : handoff && inviteValid
+        ? links.invite
+        : undefined;
   async function copy(value: string) {
+    const navigation = navigationVersion.current;
     try {
       await navigator.clipboard.writeText(value);
-      setMessage("链接已复制。");
+      if (mounted.current && navigationVersion.current === navigation)
+        setMessage("链接已复制。");
     } catch {
-      setMessage("未能复制，请选择链接文本手动复制。");
+      if (mounted.current && navigationVersion.current === navigation)
+        setMessage("未能复制，请选择链接文本手动复制。");
     }
   }
   function linkField(
@@ -269,14 +344,7 @@ export function GroupApp() {
         <button
           className="brand"
           aria-label="Weekend Merge 周末共识局"
-          onClick={() => {
-            requestVersion.current++;
-            setActiveId("");
-            setGroup(undefined);
-            setEntry(null);
-            history.replaceState(null, "", location.pathname);
-            void loadList();
-          }}
+          onClick={home}
         >
           <span className="brand-mark">
             <Leaf size={21} />
@@ -287,16 +355,7 @@ export function GroupApp() {
           </span>
         </button>
         <nav aria-label="应用导航" className="group-actions">
-          <button
-            className="text-button"
-            onClick={() => {
-              setActiveId("");
-              setGroup(undefined);
-              setEntry(null);
-              history.replaceState(null, "", location.pathname);
-              void loadList();
-            }}
-          >
+          <button className="text-button" onClick={home}>
             我的计划
           </button>
           <a className="text-button" href="#demo">
@@ -312,8 +371,9 @@ export function GroupApp() {
               <button
                 className="text-button"
                 onClick={() =>
-                  action(async () => {
+                  action(async (current) => {
                     const value = await groupClient.get(activeId);
+                    if (!current()) return;
                     setGroup(value);
                     setMessage("服务器内容已更新。");
                   })
@@ -330,14 +390,16 @@ export function GroupApp() {
             className="group-join"
             onSubmit={(e) => {
               e.preventDefault();
-              void action(async () => {
+              void action(async (current) => {
                 const value = await groupClient.join(
                   joinToken,
                   nickname.trim(),
                   handoff,
                 );
+                if (!current()) return;
                 remember(value.group.id, {
                   invite: joinToken,
+                  inviteRevision: value.group.revision,
                   ...(value.memberRecoveryToken
                     ? {
                         personal: {
@@ -390,17 +452,19 @@ export function GroupApp() {
               busy={busy}
               mutate={mutate}
               expired={Date.now() >= group.expiresAt}
-              inviteAvailable={
-                !!links.invite && Date.now() < group.inviteExpiresAt
-              }
+              inviteAvailable={!!links.invite && inviteValid}
               handoff={() => {
                 setNickname("");
                 setHandoff(true);
               }}
               rotate={() =>
-                action(async () => {
+                action(async (current) => {
                   const value = await groupClient.invite(group.id);
-                  remember(group.id, { invite: value.inviteToken });
+                  if (!current()) return;
+                  remember(group.id, {
+                    invite: value.inviteToken,
+                    inviteRevision: value.group.revision,
+                  });
                   setGroup(value.group);
                 })
               }
@@ -408,7 +472,11 @@ export function GroupApp() {
             {(links.invite || links.personal?.[memberId] || links.owner) && (
               <section className="group-links" aria-label="邀请与恢复链接">
                 <h2>把邀请发给同行的人</h2>
-                {linkField("邀请链接", "invite", links.invite)}
+                {linkField(
+                  "邀请链接",
+                  "invite",
+                  inviteValid ? links.invite : undefined,
+                )}
                 {linkField(
                   "我的恢复链接",
                   "recover",
@@ -461,10 +529,12 @@ export function GroupApp() {
             <GroupCreate
               busy={busy}
               onSubmit={(value) =>
-                action(async () => {
+                action(async (current) => {
                   const result = await groupClient.create(value);
+                  if (!current()) return;
                   remember(result.group.id, {
                     invite: result.inviteToken,
+                    inviteRevision: result.group.revision,
                     personal: { [result.memberId]: result.memberRecoveryToken },
                     owner: result.ownerRecoveryToken,
                   });
