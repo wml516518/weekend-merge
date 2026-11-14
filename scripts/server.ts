@@ -124,6 +124,12 @@ const server = createServer((incoming, target) => {
     }));
   };
   target.on("finish", finish);
+  if (url.pathname === "/healthz") {
+    if (incoming.method !== "GET" && incoming.method !== "HEAD") return jsonError(target, 405, "METHOD_NOT_ALLOWED", "Use GET for health checks.");
+    target.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+    target.end(incoming.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", release: process.env.APP_RELEASE || "local" }));
+    return;
+  }
   if (url.pathname !== planPath && url.pathname !== replanPath) {
     serveStatic(target, url.pathname);
     return;

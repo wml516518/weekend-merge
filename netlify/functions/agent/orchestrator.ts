@@ -11,6 +11,7 @@ import { ModelFinalSchema, type AgentModel, type ModelInput } from "./model";
 import { PlaceListSchema, type Place } from "./tools/contracts";
 import { shanghaiPlaces } from "./tools/places";
 import { interestMatchesTags } from "./tools/preferences";
+import { parsePlaceSearchInput } from "./tools/placeSearchInput";
 import { createAgentTools, toolInputSchemas, weatherScopeForRequest, type AgentTools } from "./tools/registry";
 import { AgentToolError, type WeatherOutput } from "./tools/weather";
 
@@ -78,10 +79,17 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
         for (const [index, call] of parsedCalls.data.entries()) {
           let code: string | undefined;
           const name = ToolNameSchema.safeParse(call.name);
+          let args: unknown;
           if (index >= 6) code = "TOOL_LIMIT_EXCEEDED";
           else if (!name.success) code = "UNKNOWN_TOOL";
           else if (ids.has(call.id)) code = "DUPLICATE_TOOL_CALL_ID";
-          else if (name.data !== "get_weather" && !toolInputSchemas[name.data].safeParse(call.args).success) code = "INVALID_TOOL_ARGUMENTS";
+          else {
+            try {
+              args = name.data === "get_weather" ? weatherScopeForRequest(request)
+                : name.data === "search_places" ? parsePlaceSearchInput(call.args, request.setup.date)
+                : toolInputSchemas[name.data].parse(call.args);
+            } catch { code = "INVALID_TOOL_ARGUMENTS"; }
+          }
           if (code || !name.success) {
             emit({ type: "tool.failed", tool: name.success ? name.data : "unknown", code: code ?? "UNKNOWN_TOOL", retryable: false });
             throw new PlanningError(code ?? "UNKNOWN_TOOL");
@@ -91,7 +99,6 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
           const started = now().getTime();
           try {
             // Parse even injected tools' inputs; no dynamic property outside the whitelist.
-            const args = tool === "get_weather" ? weatherScopeForRequest(request) : toolInputSchemas[tool].parse(call.args);
             const execute = tools[tool] as (input: unknown) => unknown | Promise<unknown>;
             const output = await execute(args);
             results.push({ id: call.id, ...(call.wireId ? { wireId: call.wireId } : {}), name: tool, output });
