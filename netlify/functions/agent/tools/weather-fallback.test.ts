@@ -47,6 +47,20 @@ describe("QWeather fallback", () => {
     expect((await createWeatherTool({ fetch: fetcher, now, env })(input)).source).toBe("qweather");
   });
 
+  it("supports an API host under the shared QWeather regional subdomain", async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.startsWith("https://api.open-meteo.com/")) throw new Error("connection timeout");
+      expect(new URL(url).origin).toBe("https://nh2yw3hdrc.re.qweatherapi.com");
+      return Response.json(forecast);
+    });
+    const weather = createWeatherTool({
+      fetch: fetcher,
+      now,
+      env: { ...env, QWEATHER_API_HOST: "nh2yw3hdrc.re.qweatherapi.com" },
+    });
+    expect((await weather(input)).source).toBe("qweather");
+  });
+
   it("keeps a successful Open-Meteo request free of authenticated fallback calls", async () => {
     const fetcher = vi.fn(async () => Response.json({ hourly: {
       time: ["2026-11-14T12:00"], temperature_2m: [17], precipitation_probability: [20], weather_code: [0],

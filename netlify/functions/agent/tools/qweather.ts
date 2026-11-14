@@ -26,7 +26,7 @@ export async function fetchQWeather(input: WeatherInput, env: WeatherEnvironment
   const host = env.QWEATHER_API_HOST?.trim();
   const key = env.QWEATHER_API_KEY?.trim();
   // Keys must never be sent to arbitrary URLs, localhost, paths or query strings.
-  if (!key || !host || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.qweatherapi\.com$/i.test(host)) {
+  if (!key || !host || !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+qweatherapi\.com$/i.test(host)) {
     throw new Error("Weather fallback is not configured");
   }
   const start = Date.parse(input.start);
