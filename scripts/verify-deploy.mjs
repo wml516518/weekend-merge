@@ -14,6 +14,8 @@ process.env.PM2_HOME = join(sandbox, "pm2");
 process.env.HOST = "127.0.0.1";
 process.env.PORT = "8787";
 process.env.DEEPSEEK_API_KEY = "deployment-test-key-not-a-real-key";
+process.env.QWEATHER_API_KEY = "weather-test-key-not-a-real-key";
+process.env.QWEATHER_API_HOST = "test.qweatherapi.com";
 delete process.env.APP_RELEASE;
 delete process.env.STATIC_ROOT;
 const pm2 = args => execFileSync("pm2", args, {
@@ -53,6 +55,8 @@ try {
   assert.equal(active.pm2_env.pm_exec_path, join(directory, "dist-server", "server.mjs"));
   assert.equal(active.pm2_env.pm_cwd, directory);
   assert.equal(active.pm2_env.DEEPSEEK_API_KEY, "deployment-test-key-not-a-real-key");
+  assert.equal(active.pm2_env.QWEATHER_API_KEY, "weather-test-key-not-a-real-key");
+  assert.equal(active.pm2_env.QWEATHER_API_HOST, "test.qweatherapi.com");
   console.log("PASS: PM2 activated the new executable/cwd, preserved environment, and passed static/API checks");
 
   const broken = `${"c".repeat(40)}-101-1`;
@@ -64,6 +68,8 @@ try {
   const restored = JSON.parse(pm2(["jlist"])).find(p => p.name === "weekend-merge");
   assert.equal(restored.pm2_env.pm_exec_path, join(directory, "dist-server", "server.mjs"));
   assert.equal(restored.pm2_env.pm_cwd, directory);
+  assert.equal(restored.pm2_env.QWEATHER_API_KEY, "weather-test-key-not-a-real-key");
+  assert.equal(restored.pm2_env.QWEATHER_API_HOST, "test.qweatherapi.com");
   console.log("PASS: a crashing release was rolled back to the previous executable and working directory");
 } finally {
   try { pm2(["kill"]); } catch { /* Best effort for this isolated daemon only. */ }

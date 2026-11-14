@@ -23,7 +23,8 @@ async function fixture() {
   await writeFile(join(root, ".env"), "server-only-secret");
   let active: Record<string, any> | undefined = {
     name: "weekend-merge", script: join(root, "dist-server", "server.mjs"), cwd: root,
-    env: { DEEPSEEK_API_KEY: "private-test-key", DEEPSEEK_MODEL: "deepseek-flash", PORT: "8787" },
+    env: { DEEPSEEK_API_KEY: "private-test-key", DEEPSEEK_MODEL: "deepseek-flash", PORT: "8787",
+      QWEATHER_API_KEY: "private-weather-key", QWEATHER_API_HOST: "example.qweatherapi.com" },
   };
   const operations: string[] = [];
   const pm2 = (args: string[]) => {
@@ -66,6 +67,7 @@ describe("server artifact deployment", () => {
     expect(f.active().script).toBe(join(f.root, ".deploy", "releases", f.release, "dist-server", "server.mjs"));
     expect(f.active().cwd).toBe(join(f.root, ".deploy", "releases", f.release));
     expect(f.active().env).toMatchObject({ DEEPSEEK_API_KEY: "private-test-key", DEEPSEEK_MODEL: "deepseek-flash", APP_RELEASE: f.release });
+    expect(f.active().env).toMatchObject({ QWEATHER_API_KEY: "private-weather-key", QWEATHER_API_HOST: "example.qweatherapi.com" });
     expect(await readFile(join(f.root, ".env"), "utf8")).toBe("server-only-secret");
     expect(paths).toContain("/.netlify/functions/plan");
     expect(f.operations.at(-1)).toBe("save");
@@ -78,6 +80,7 @@ describe("server artifact deployment", () => {
     await expect(deployRelease({ ...f, fetch: fetcher, pause: async () => {} })).rejects.toThrow(/rolled back/i);
     expect(f.active().script).toBe(join(f.root, "dist-server", "server.mjs"));
     expect(f.active().env.DEEPSEEK_API_KEY).toBe("private-test-key");
+    expect(f.active().env.QWEATHER_API_KEY).toBe("private-weather-key");
     expect(f.active().env.APP_RELEASE).toBeFalsy();
     expect(f.operations.filter(x => x === "start")).toHaveLength(2);
     await expect(readFile(join(f.root, ".deploy", "current.json"))).rejects.toMatchObject({ code: "ENOENT" });

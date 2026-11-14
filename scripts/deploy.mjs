@@ -24,7 +24,7 @@ function snapshot(pm2) {
   const previous = matches[0].pm2_env;
   if (!isAbsolute(previous.pm_exec_path) || !isAbsolute(previous.pm_cwd)) throw new Error("Invalid PM2 application paths");
   const env = {};
-  for (const key of ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV"]) {
+  for (const key of ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV"]) {
     env[key] = previous[key] ?? previous.env?.[key] ?? "";
   }
   env.HOST ||= "127.0.0.1";

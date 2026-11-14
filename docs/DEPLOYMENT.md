@@ -63,4 +63,4 @@ cat /home/admin/apps/weekend-merge/.deploy/current.json
 
 自动回滚失败时，工作流会明确报告。此时先在服务器检查 `pm2 status weekend-merge` 和错误日志，保留旧版本目录。不要删除原项目或执行强制 Git 重置。
 
-真实 Agent 验证应额外发送一次 `mode: "live"` 请求：无 `run.degraded` 表示模型候选通过校验；`tool.completed` 中的 `get_weather` 且来源为 `open-meteo` 表示取得真实天气结果或其缓存。地图、地点目录、路线估算的能力边界不因部署方式改变。
+真实 Agent 验证应额外发送一次 `mode: "live"` 请求：无 `run.degraded` 表示模型候选通过校验；`tool.completed` 中的 `get_weather` 且来源为 `open-meteo` 或 `qweather` 表示取得对应上游的真实预报或其成功缓存。和风天气凭据、免费额度与启用前署名要求见[天气接入说明](WEATHER.md)。部署和回滚均保留 PM2 中的 `QWEATHER_API_HOST`、`QWEATHER_API_KEY`；修改 `.env` 后需按说明更新 PM2 环境。地图、地点目录、路线估算的能力边界不因部署方式改变。

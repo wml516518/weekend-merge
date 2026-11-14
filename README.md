@@ -39,7 +39,7 @@ npm run build
 
 `.env.example` 列出 `DEEPSEEK_API_KEY` 和可选的 `DEEPSEEK_MODEL`。需要 DeepSeek 时将它们配置为 Netlify Function 的服务端环境变量；本地开发可放在未提交的 `.env` 中。`DEEPSEEK_MODEL` 未配置时默认使用 `deepseek-flash`。不要使用 `VITE_` 前缀或将密钥放进浏览器代码。未配置 Key 或模型失败时，`mode: "live"` 会显式降级为规则规划；规则规划不请求天气，也不伪造预报。
 
-部署需提供 Node.js 22+、Netlify Functions，以及可选的服务端 DeepSeek 配置。`netlify.toml` 已设置构建命令和 Node 版本。DeepSeek API 按 Token 计费；调用天气工具时依赖 Open-Meteo 的可用性。服务价格、配额和使用政策需按实际部署核对。
+部署需提供 Node.js 22+、Netlify Functions，以及可选的服务端 DeepSeek 配置。`netlify.toml` 已设置构建命令和 Node 版本。DeepSeek API 按 Token 计费；天气优先使用 Open-Meteo，失败时可切换到已配置的和风天气，返回实际来源。和风天气免费额度、服务器配置与上线前署名要求见[天气接入说明](docs/WEATHER.md)，服务价格、配额和使用政策需按实际部署核对。
 
 ## Netlify 部署
 
@@ -125,6 +125,7 @@ Cloudflare 把子域 A/AAAA/CNAME 记录指向服务器并开启代理即可；S
 - [架构与降级路径](docs/ARCHITECTURE.md)
 - [本地 API 演示](docs/DEMO.md)
 - [服务器自动部署](docs/DEPLOYMENT.md)
+- [天气接口与和风天气配置](docs/WEATHER.md)
 - [产品需求与系统设计](docs/PRD.md)
 - [前端设计、模块入口与接入边界](docs/FRONTEND.md)
 - [Agent 事件契约](src/contracts/agent.ts)

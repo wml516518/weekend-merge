@@ -11,6 +11,30 @@ const post = (body: unknown) => new Request(url, { method: "POST", body: JSON.st
 afterEach(() => vi.unstubAllGlobals());
 
 describe("plan function", () => {
+  it("uses server-supplied QWeather configuration without exposing credentials in NDJSON", async () => {
+    vi.stubGlobal("fetch", async (target: string) => {
+      const targetUrl = new URL(target);
+      if (targetUrl.hostname === "api.open-meteo.com") return new Response(null, { status: 503 });
+      expect(targetUrl.hostname).toBe("localtest.qweatherapi.com");
+      return Response.json({ metadata: { attributions: ["https://developer.qweather.com/attribution.html"] },
+        hours: [3, 4, 5, 6, 7, 8, 9].map(hour => ({ forecastTime: `2026-11-14T0${hour}:00Z`,
+          temperature: { value: 20, unit: "°C" }, precipitation: { probability: 0.5 }, condition: { code: "305" } })) });
+    });
+    let turns = 0;
+    const response = await createPlanHandler({ now, limiter: createPlanningLimiter(),
+      env: { DEEPSEEK_API_KEY: "test-model-key", QWEATHER_API_HOST: "localtest.qweatherapi.com", QWEATHER_API_KEY: "test-weather-key" },
+      createModel: () => ({ next: async () => {
+        if (turns++ === 0) return { type: "tool_call", id: "weather", name: "get_weather", args: {} };
+        throw new Error("skip final model generation");
+      } }),
+    })(post({ ...demoRequest, setup: { ...demoRequest.setup, startTime: "11:00", endTime: "18:00" }, mode: "live" }));
+    const text = await response.text();
+    const events = text.trim().split("\n").map(line => JSON.parse(line));
+    expect(events).toContainEqual(expect.objectContaining({ type: "tool.completed", tool: "get_weather", source: "qweather",
+      summary: expect.objectContaining({ hourlyCount: 7, maxPrecipitationProbability: 50 }) }));
+    expect(text).not.toMatch(/test-model-key|test-weather-key|skip final model/);
+  });
+
   it("accepts POST only and returns the public error envelope", async () => {
     const response = await handler(new Request(url));
     expect(response.status).toBe(405);
