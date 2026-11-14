@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { createPlanHandler } from '../../netlify/functions/plan';
 import { createGroupApi, groupPublicOrigin, readGroupJsonBody, type GroupApiOptions } from './api';
 import { GroupRepository } from './repository';
@@ -18,6 +19,14 @@ export function createGroupRuntime(options: GroupRuntimeOptions) {
   const env = options.env ?? process.env;
   // A persistent user data directory, never the release or static directory.
   const path = options.path ?? env.GROUP_DB_PATH ?? join(homedir(), '.local', 'share', 'weekend-merge', 'groups.sqlite');
+  if (env.NODE_ENV === 'production') {
+    const physical = (value: string): string => existsSync(value) ? realpathSync(value) : join(physical(dirname(value)), basename(value));
+    const staticRoot = physical(resolve(env.STATIC_ROOT ?? 'dist'));
+    const databasePath = physical(resolve(path));
+    if (!(options.path ?? env.GROUP_DB_PATH) || !isAbsolute(path) || databasePath === staticRoot || databasePath.startsWith(staticRoot + sep) || /[/\\]\.deploy[/\\](releases|uploads)[/\\]/.test(databasePath)) {
+      throw new Error('INVALID_GROUP_DB_PATH: production requires an absolute persistent path outside static and releases');
+    }
+  }
   const concurrency = options.concurrency ?? Number(env.GROUP_JOB_CONCURRENCY ?? 2);
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 4) throw new Error('INVALID_CONCURRENCY');
   const repo = new GroupRepository({ path, now: options.now });

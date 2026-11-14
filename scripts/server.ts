@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { extname, join, normalize, resolve } from "node:path";
+import { createReadStream, existsSync, statSync, realpathSync } from "node:fs";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
@@ -88,11 +88,13 @@ function serveStatic(target: ServerResponse, pathname: string): void {
   const decodedPath = decodeURIComponent(pathname);
   const relativePath = normalize(decodedPath).replace(/^(\.\.[/\\])+/, "");
   let filePath = join(staticRoot, relativePath === "/" ? "index.html" : relativePath);
-  if (!filePath.startsWith(staticRoot)) return jsonError(target, 403, "FORBIDDEN", "Path is outside the static root.");
+  if (filePath !== staticRoot && !filePath.startsWith(staticRoot + sep)) return jsonError(target, 403, "FORBIDDEN", "Path is outside the static root.");
+  if (/\.(sqlite|db)(-|\.|$)|\.bak$|(^|[/\\])(data-runtime|backups|\.deploy)([/\\]|$)/i.test(decodedPath)) return jsonError(target, 404, 'NOT_FOUND', 'Static asset is unavailable.');
   if (!existsSync(filePath)) filePath = join(staticRoot, "index.html");
   if (!existsSync(filePath) || !statSync(filePath).isFile()) {
     return jsonError(target, 404, "NOT_FOUND", "Static asset is unavailable.");
   }
+  if (!realpathSync(filePath).startsWith(realpathSync(staticRoot) + sep)) return jsonError(target, 403, 'FORBIDDEN', 'Path is outside the static root.');
   const extension = extname(filePath).toLowerCase();
   const isHtml = extension === ".html";
   target.writeHead(200, {

@@ -12,7 +12,9 @@ export interface GroupApiOptions {
 
 /** Never derive the public origin from a Host or forwarded header. */
 export function groupPublicOrigin(options: GroupApiOptions): string {
-  const url = new URL(options.publicOrigin ?? '');
+  let url: URL;
+  try { url = new URL(options.publicOrigin ?? ''); }
+  catch { throw new Error('PUBLIC_ORIGIN must be configured as a canonical HTTPS origin'); }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.username || url.password || url.pathname !== '/' || url.search || url.hash ||
       (url.protocol !== 'https:' && !(options.development === true && url.protocol === 'http:' && loopback))) {

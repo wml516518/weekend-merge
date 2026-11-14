@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.11.0"
   },
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,9 @@
     "test": "vitest --passWithNoTests",
     "test:watch": "vitest",
     "build:server": "esbuild scripts/server.ts --bundle --platform=node --format=esm --outfile=dist-server/server.mjs --external:react --external:react-dom --external:lucide-react --external:zustand --log-level=warning",
-    "start": "node dist-server/server.mjs",
+    "start": "node --experimental-sqlite dist-server/server.mjs",
+    "test:node22": "node --experimental-sqlite node_modules/vitest/vitest.mjs run --config vitest.node22.config.ts",
+    "backup:groups": "node --experimental-sqlite scripts/backup-groups.mjs",
     "build:web": "tsc -b && vite build",
     "build:server:only": "tsc --noEmit -p tsconfig.functions.json && npm run build:server"
   },

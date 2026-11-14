@@ -1,53 +1,78 @@
-# GitHub Actions → 阿里云服务器
+# GitHub Actions → 阿里云持久化部署
 
-生产地址为 `https://weekendmerge.ailoong.net.cn/`。应用使用 Node.js 22+ 和用户 `admin` 的 PM2 进程 `weekend-merge`，监听 `127.0.0.1:8787`，由现有 Nginx 代理。GitHub 执行测试与构建，服务器仅解压产物并启动 Node，不运行 npm 安装或前端构建。
+目标根目录 `/home/admin/apps/weekend-merge`，PM2 名称 `weekend-merge`，单个 fork 实例，Node **22.11.0+**，监听 `127.0.0.1:8787`，Nginx 在外层提供 HTTPS。服务器仅解压已验证产物；不安装依赖、不前端构建。公网域名 `https://weekendmerge.ailoong.net.cn` 当前须先修复证书/Cloudflare 代理：直接源站的 Cloudflare Origin CA 证书不被公共浏览器信任。loopback 健康检查不等于公网 HTTPS 验证。
 
-## 一次性准备
+## 稳定数据与进程配置
 
-在 GitHub 仓库 Settings → Secrets and variables → Actions 配置：
-
-| 类型 | 名称 | 内容 |
-| --- | --- | --- |
-| Secret | `DEPLOY_SSH_KEY` | 专用 Ed25519 私钥；公钥由服务器用户授权 |
-| Secret | `DEPLOY_KNOWN_HOSTS` | 已核实的服务器 SSH 主机公钥行；禁止关闭主机校验 |
-| Variable | `DEPLOY_HOST` | `8.148.30.195` |
-| Variable | `DEPLOY_USER` | `admin` |
-| Variable | `DEPLOY_PORT` | `22`，如修改 SSH 端口则相应调整 |
-| Variable | `DEPLOY_PATH` | `/home/admin/apps/weekend-merge` |
-| Variable | `DEPLOY_ENABLED` | 准备期间为 `false`，授权完成后设为 `true` |
-
-Environment 使用 `production`，建议只允许 `main` 分支部署。DeepSeek Key 留在服务器 PM2 环境中，无需复制到 GitHub。私钥、`.env`、`.deploy/` 均不得提交到仓库。
-
-在服务器以当前管理 PM2 的 `admin` 用户进入项目目录，拉取包含此流程的 `main`，运行一次：
-
-```bash
-cd /home/admin/apps/weekend-merge
-git pull --ff-only origin main
-node scripts/setup-deploy.mjs 'ssh-ed25519 此处替换为专用公钥 github-actions-weekend-merge'
+```text
+/home/admin/apps/weekend-merge/
+  data-runtime/groups.sqlite         # 唯一生产 GROUP_DB_PATH
+  data-runtime/groups.sqlite-wal     # SQLite 管理；不可单独拷贝或删除
+  data-runtime/groups.sqlite-shm
+  data-runtime/backups/              # 在线一致性快照
+  .deploy/releases/<release>/        # 可替换的静态与服务器产物
+  .deploy/uploads/
 ```
 
-初始化脚本要求 Node.js 22+、可访问 PM2，且已有唯一的 `weekend-merge` 进程。它保留已有 SSH 公钥，追加带 `restrict` 选项的部署公钥，并记录当前 Node/PM2 所在路径，解决非交互式 SSH 的 PATH 不同问题。它不重启网站，不需要 sudo。
+`data-runtime`、`backups` 模式700，数据库/WAL/SHM/备份600，归属运行服务的 admin 用户。启动校验归属并拒绝用户目录符号链接，数据库不能位于静态或发布目录，静态服务器拒绝 SQLite/备份路径及越界符号链接。不要把 static root 指向数据目录。部署固定 `GROUP_DB_PATH` 为根目录下 `data-runtime/groups.sqlite`，跨版本不变；已配置其他路径时拒绝发布，先停机迁移并核对完整性。
 
-若项目存在本地已跟踪文件的修改，`git pull --ff-only` 可能拒绝更新；先检查 `git status --short`，保留这些修改后再继续。服务器的 `.env` 不受 Git 管理。
+PM2 必须采用以下配置含义：`instances:1`、`exec_mode:fork`、`node_args:["--experimental-sqlite"]`、`kill_timeout:240000`。参数只传服务器/备份 SQLite 子进程，不设置全局 NODE_OPTIONS。默认并发2，`GROUP_JOB_CONCURRENCY` 可设1–4。关闭时停止接新请求/任务，清理 unref 定时器并等待活动任务写完再关库；发布先删除旧进程、等待停止，再启动新进程，禁止 reload/cluster 造成队列恢复重叠。停机上限240秒后 PM2 会强杀；再次启动将中断任务标记失败，发起人明确重试。不能保证上游扣费 exactly-once。
 
-确认 GitHub Actions 能经服务器 SSH 端口连接。准备完成后，将 `DEPLOY_ENABLED` 设为 `true`，到 Actions → `test-and-build` → Run workflow，选择 `main`。以后每次推送或合并到 `main` 都会自动测试、构建和部署。PR 只运行测试和构建，不连接服务器。
+必须的服务端环境：
 
-## 发布过程
+```bash
+NODE_ENV=production
+PUBLIC_ORIGIN=https://weekendmerge.ailoong.net.cn
+GROUP_DB_PATH=/home/admin/apps/weekend-merge/data-runtime/groups.sqlite
+GROUP_JOB_CONCURRENCY=2
+HOST=127.0.0.1
+PORT=8787
+TRUSTED_PROXY_DEPTH=1
+```
 
-1. CI 使用 `npm ci`、`npm test -- --run`、`npm run build`，并在独立 PM2_HOME 中验证真实 PM2 的版本切换与崩溃回滚，任一步失败都不会部署。
-2. 打包 `dist/`、独立的 `dist-server/server.mjs`、部署脚本和演示请求 fixture。构建产物保留七天。
-3. 通过校验服务器主机公钥的 SSH/SCP 上传。发布任务串行执行，重跑旧提交不会覆盖已更新的 `main`。
-4. 产物放入 `.deploy/releases/<commit>-<run>-<attempt>/`。原仓库、`.env` 和其他网站不被覆盖。
-5. 从现有 PM2 进程继承 DeepSeek Key、模型名等应用配置，切换 `weekend-merge` 的脚本及工作目录。
-6. 检查 `/healthz` 的版本标识、首页 HTML、演示规划 API 的 NDJSON 和三个候选方案，然后保存 PM2 状态。检查失败则恢复部署前的脚本、工作目录和应用环境，工作流报告失败。
+部署白名单保留上述配置以及 DeepSeek/QWeather Key/模型/host。Key 不放 GitHub、不打印 `pm2 jlist`/dump 或临时配置。发布失败恢复旧 script/cwd/env/node_args，数据库始终保留当前内容，不自动恢复旧备份。v1 迁移只增表，旧schema迁移前另做 VACUUM INTO 快照；未来不向后兼容迁移需单独维护窗口，不能假设代码回滚自动反向迁移数据库。
 
-这是单进程部署，切换期间可能有短暂不可用，不承诺无中断。部署检查使用 `mode: "demo"`，不会消耗模型额度，也不能证明 DeepSeek 或天气上游服务可用。
+## 准备与发布
 
-PM2 切换用的临时配置包含运行环境，仅写入权限为 `700` 的 `.deploy/` 下，文件权限 `600`，结束后移除。不要打印 `pm2 jlist` 的完整结果或上传 PM2 dump，它们可能包含 Key。
+GitHub Actions secrets：`DEPLOY_SSH_KEY`（专用 Ed25519 私钥）、`DEPLOY_KNOWN_HOSTS`（核实后的服务器主机公钥）。Variables：`DEPLOY_HOST=8.148.30.195`、`DEPLOY_USER=admin`、`DEPLOY_PORT=22`、`DEPLOY_PATH=/home/admin/apps/weekend-merge`、`DEPLOY_ENABLED=false`（运维授权后再启用）。Environment 为 `production`，建议限制 main。
 
-## 检查与故障处理
+以当前 PM2 管理用户在项目根目录，确认唯一现有服务及上述 env 后运行：
 
-在服务器运行：
+```bash
+node scripts/setup-deploy.mjs 'ssh-ed25519 替换成专用公钥 github-actions-weekend-merge'
+```
+
+它只追加受限 SSH 公钥、创建私有部署/数据目录、记录 Node/PM2 路径，不重启服务。首次切换前应在维护窗口为现有 PM2 服务设置240秒 kill_timeout；旧版无小组任务时也要确认没有正在进行的 live 请求。不要在任务未完成时依赖旧默认1.6秒超时。
+
+CI 固定 Node22.11.0，`npm ci` → `npm run test:node22`（fork 启动显式 SQLite flag）→ `npm run build` → 隔离 PM2 干跑。产物包含 dist、dist-server、deploy/backup 脚本及演示 fixture，不包含数据库。main 发布串行执行，旧 workflow 重跑不会覆盖更新的 main。SSH 核对主机，上传后调用 `.deploy/run-node <upload>/scripts/deploy.mjs <root> <release>`。
+
+发布在首次启动新 bundle 前用 VACUUM INTO 做一致性备份，包含已提交的 WAL 页；备份失败则不激活新版本。随后切换单进程，检查版本 `/healthz`、首页和显式 demo 三候选结果，成功才 PM2 save。检查使用 demo，不调用付费模型。失败恢复旧进程并报告失败；旧 release 和备份保留供人工检查。
+
+## 在线备份与离线恢复
+
+在应用仍运行时执行（脚本检查完整性后才报告输出路径）：
+
+```bash
+node --experimental-sqlite scripts/backup-groups.mjs \
+  /home/admin/apps/weekend-merge/data-runtime/groups.sqlite
+```
+
+备份文件名带 UTC 时间与 UUID，目标必须不存在，不覆盖旧文件。不要直接复制运行中的主文件或删 WAL/SHM。备份中包含偏好与授权哈希，按私有数据存储；线上三十天清理不删除历史备份，运维需另设保留政策、磁盘告警及受控异机备份。本项目不擅自自动删除备份。
+
+恢复必须先停止唯一实例，确认没有其他 Node/SQLite 写进程。恢复会拒绝遗留 WAL/SHM；若仍存在，先调查进程/强杀恢复问题，不要直接删除。完整性校验失败拒绝恢复，旧库另存 `before-restore-...bak`，便于回退：
+
+```bash
+pm2 stop weekend-merge
+node --experimental-sqlite scripts/backup-groups.mjs --restore \
+  /absolute/private/backup.sqlite.bak \
+  /home/admin/apps/weekend-merge/data-runtime/groups.sqlite --service-stopped
+pm2 restart weekend-merge
+curl -fsS http://127.0.0.1:8787/healthz
+```
+
+`--service-stopped` 是操作者声明，不代替进程检查；恢复会回到快照时刻，之后数据只存在于保留的旧库。一般应用回滚不需要恢复数据库。
+
+## 运维验证与边界
 
 ```bash
 curl -fsS http://127.0.0.1:8787/healthz
@@ -55,12 +80,8 @@ pm2 status weekend-merge
 cat /home/admin/apps/weekend-merge/.deploy/current.json
 ```
 
-`/healthz` 只返回状态和版本，不包含 Key。`current.json` 记录最近成功发布标识及之前的脚本路径。旧版本保留在 `releases/`，便于人工恢复；目前不自动删除旧版本，定期查看该目录占用。
+复查版本、唯一实例、db绝对路径/权限，再用已有 Cookie/恢复链接打开受控小组确认保留数据。Nginx 应覆盖 `X-Forwarded-For` 为可信链；`/api/`、`/.netlify/functions/` 不缓存，HTTP/1.1、关闭响应缓冲，域名证书须公开受信任。Cookie Secure 依赖正确 HTTPS。
 
-若 Actions SSH 认证失败，检查部署公钥是否属于同一用户、GitHub 私钥是否匹配、`.ssh` 为 `700`、`authorized_keys` 为 `600`。主机校验失败时应核实服务器主机指纹后更新 `DEPLOY_KNOWN_HOSTS`。
+真实 Agent 验证必须通过两个小组、各成员独立提交触发，不能调用被禁用的旧公开 live API。仅在审查和计费授权后执行。检查每组持久事件的模型来源/无降级、`get_weather` 的 open-meteo/qweather 实际来源及证据，核对结果绑定、耗时和内存。固定目录地点、路线/费用估算与天气真实来源是不同能力，不能据一次 demo 健康检查宣称全部实时。
 
-若提示 Node/PM2 不可用，以正常管理网站的 SSH 交互式终端重新运行初始化脚本。若部署进程被强制终止，确认没有发布正在进行后，才可移除 `.deploy/deploy.lock` 并重新部署。
-
-自动回滚失败时，工作流会明确报告。此时先在服务器检查 `pm2 status weekend-merge` 和错误日志，保留旧版本目录。不要删除原项目或执行强制 Git 重置。
-
-真实 Agent 验证应额外发送一次 `mode: "live"` 请求：无 `run.degraded` 表示模型候选通过校验；`tool.completed` 中的 `get_weather` 且来源为 `open-meteo` 或 `qweather` 表示取得对应上游的真实预报或其成功缓存。和风天气凭据、免费额度与启用前署名要求见[天气接入说明](WEATHER.md)。部署和回滚均保留 PM2 中的 `QWEATHER_API_HOST`、`QWEATHER_API_KEY`；修改 `.env` 后需按说明更新 PM2 环境。地图、地点目录、路线估算的能力边界不因部署方式改变。
+本地可重复干跑：完成 build 后，用安装在临时目录的 PM2 将其 `.bin` 加入 PATH，再运行 `node scripts/verify-deploy.mjs`。脚本自行创建并清理一次性 PM2_HOME，只测试临时服务；不要改为现有 PM2_HOME。崩溃回滚、持久化及备份离线恢复均为本地验证，不能替代上线验收。部署锁遗留时须确认无发布正在运行，再由运维处理；保留 release、数据库和日志，不做强制 Git 重置。

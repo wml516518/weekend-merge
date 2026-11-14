@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { chmodSync, existsSync, lstatSync, mkdirSync } from 'node:fs';
+import { dirname, resolve, parse } from 'node:path';
 import { createRequire } from 'node:module';
 import type { DatabaseSync as SQLiteDatabase } from 'node:sqlite';
 
@@ -14,15 +14,34 @@ export function transaction<T>(db: SQLiteDatabase, action: () => T): T {
 
 export function openDatabase(path: string): SQLiteDatabase {
   const existed = path !== ':memory:' && existsSync(path);
-  if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  if (path !== ':memory:') {
+    let current = resolve(path);
+    while (current !== parse(current).root) {
+      // macOS /tmp and /var are OS aliases; validate the DB and its immediate parent
+      // and all non-system ancestors, without following a user-controlled symlink.
+      if (!['/tmp', '/var'].includes(current) && lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('INVALID_GROUP_DB_PATH: symlink');
+      current = dirname(current);
+    }
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    for (const file of [dirname(path), path, `${path}-wal`, `${path}-shm`]) {
+      if (!existsSync(file)) continue;
+      const info = lstatSync(file);
+      if (info.isSymbolicLink() || (process.getuid && info.uid !== process.getuid())) throw new Error('INVALID_GROUP_DB_PATH: ownership');
+      chmodSync(file, file === dirname(path) ? 0o700 : 0o600);
+    }
+  }
   const db = new DatabaseSync(path);
   try {
     db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;');
+    if (path !== ':memory:') for (const file of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(file)) chmodSync(file, 0o600);
     const version = Number((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
     if (version > 1) throw new Error('UNSUPPORTED_DATABASE_VERSION');
     if (version === 0) {
       // VACUUM INTO includes committed WAL pages; copying only the main file does not.
-      if (existed) db.prepare('VACUUM INTO ?').run(`${path}.before-v1-${Date.now()}-${Math.random().toString(16).slice(2)}.bak`);
+      if (existed) {
+        const backup = `${path}.before-v1-${Date.now()}-${Math.random().toString(16).slice(2)}.bak`;
+        db.prepare('VACUUM INTO ?').run(backup); chmodSync(backup, 0o600);
+      }
       transaction(db, () => db.exec(`
         CREATE TABLE IF NOT EXISTS groups (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, target_count INTEGER NOT NULL CHECK(target_count BETWEEN 2 AND 6),
