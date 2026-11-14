@@ -103,7 +103,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
             const output = await execute(args);
             results.push({ id: call.id, ...(call.wireId ? { wireId: call.wireId } : {}), name: tool, output });
             if (tool === "get_weather") weather = output as WeatherOutput;
-            emit({ type: "tool.completed", tool, summary: toolEvidence(tool, output, request, places.data, `tool-candidate-${index + 1}`), durationMs: Math.max(0, Math.round(now().getTime() - started)), source: tool === "get_weather" ? "open-meteo" : tool === "search_places" ? "curated-shanghai-catalog" : "local" });
+            emit({ type: "tool.completed", tool, summary: toolEvidence(tool, output, request, places.data, `tool-candidate-${index + 1}`), durationMs: Math.max(0, Math.round(now().getTime() - started)), source: tool === "get_weather" ? (output as WeatherOutput).source : tool === "search_places" ? "curated-shanghai-catalog" : "local" });
           } catch (error) {
             if (deliveryFailed) throw error;
             const weatherUnavailable = error instanceof AgentToolError && error.code === "WEATHER_UNAVAILABLE";

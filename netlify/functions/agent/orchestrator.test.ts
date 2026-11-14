@@ -51,6 +51,20 @@ function candidates(events: AgentEvent[]) {
 }
 
 describe("controlled planning orchestrator", () => {
+  it("passes QWeather observations to the model and publishes the actual provider and attribution", async () => {
+    const script = scripted([weatherCall, final]);
+    const qweather = { ...weather, source: "qweather" as const, weatherCodeSystem: "qweather" as const,
+      attributions: ["https://developer.qweather.com/attribution.html"] };
+    const tools = createAgentTools({ request, places, weather: async () => qweather });
+    const events = await runPlanningAgent(request, { places, now, tools, model: script.model });
+    expect(script.inputs[1].toolResults[0].output).toEqual(qweather);
+    expect(events).toContainEqual(expect.objectContaining({ type: "tool.completed", tool: "get_weather", source: "qweather",
+      summary: expect.objectContaining({ source: "qweather", attributions: ["https://developer.qweather.com/attribution.html"],
+        hourlyCount: 1, temperatureMinC: 20, maxPrecipitationProbability: 0 }) }));
+    expect(events.some(event => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events)).toHaveLength(3);
+  });
+
   it("returns parallel results with original IDs, verifies three plans, and emits schema-valid events", async () => {
     const script = scripted([{ type: "tool_calls", calls: [
       { ...weatherCall, wireId: "weather-wire-1" },

@@ -6,13 +6,16 @@ import { planningClientKey, productionPlanningLimiter, validateRequestDate, type
 import type { AgentModel } from "./agent/model";
 import { runPlanningAgent } from "./agent/orchestrator";
 import { createAgentTools } from "./agent/tools/registry";
+import { createWeatherTool } from "./agent/tools/weather";
+import type { WeatherEnvironment } from "./agent/tools/qweather";
 
 export function createPlanHandler(dependencies: {
   now?: () => Date;
   limiter?: PlanningLimiter;
-  env?: { DEEPSEEK_API_KEY?: string; DEEPSEEK_MODEL?: string };
+  env?: { DEEPSEEK_API_KEY?: string; DEEPSEEK_MODEL?: string } & WeatherEnvironment;
   createModel?: (config: { apiKey: string; model: string }) => AgentModel;
 } = {}) {
+  const configuredWeather = dependencies.env ? createWeatherTool({ env: dependencies.env, now: dependencies.now }) : undefined;
   return async (request: Request): Promise<Response> => {
     if (request.method !== "POST") return jsonError(405, "METHOD_NOT_ALLOWED", "Use POST to start a plan.");
     const parsed = await parseJsonRequest(request, PlanRequestSchema);
@@ -36,7 +39,7 @@ export function createPlanHandler(dependencies: {
         try { model = (dependencies.createModel ?? createDeepSeekModel)({ apiKey, model: modelName }); }
         catch { /* The orchestrator explicitly reports the missing model and uses rule plans. */ }
       }
-      const tools = createAgentTools({ request: body });
+      const tools = createAgentTools({ request: body, weather: configuredWeather });
       return ndjsonStream((onEvent) => runPlanningAgent(body, { model, tools, now, onEvent }));
     } catch {
       return jsonError(500, "PLANNING_FAILED", "Planning could not be completed.", undefined, true);

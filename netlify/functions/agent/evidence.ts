@@ -42,7 +42,7 @@ export function toolEvidence(tool: ToolName, output: unknown, request: PlanReque
       const scope = weatherScopeForRequest(request);
       const temperatures = weather.hourly.map((hour) => hour.temperatureC);
       const rain = weather.hourly.map((hour) => hour.precipitationProbability);
-      return WeatherEvidenceSchema.parse({ source: "open-meteo", reference: "上海", interval: { start: scope.start, end: scope.end },
+      return WeatherEvidenceSchema.parse({ source: weather.source, ...(weather.attributions ? { attributions: weather.attributions } : {}), reference: "上海", interval: { start: scope.start, end: scope.end },
         hourlyCount: weather.hourly.length, temperatureMinC: temperatures.length ? minimum(temperatures) : null,
         temperatureMaxC: temperatures.length ? maximum(temperatures) : null, maxPrecipitationProbability: rain.length ? maximum(rain) : null,
       });

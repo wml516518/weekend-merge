@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchQWeather, type WeatherEnvironment } from "./qweather";
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -25,7 +26,9 @@ const HourlyResponseSchema = z.object({
 
 export type WeatherInput = z.input<typeof WeatherInputSchema>;
 export type WeatherOutput = {
-  source: "open-meteo";
+  source: "open-meteo" | "qweather";
+  weatherCodeSystem?: "qweather";
+  attributions?: string[];
   hourly: Array<{
     time: string;
     temperatureC: number;
@@ -49,8 +52,10 @@ export function createWeatherTool(dependencies: {
   fetch?: typeof fetch;
   now?: () => Date;
   maxEntries?: number;
+  env?: WeatherEnvironment;
 } = {}): (input: WeatherInput) => Promise<WeatherOutput> {
   const cache = new Map<string, { expiresAt: number; hourly: Promise<WeatherOutput["hourly"]> }>();
+  const fallbackCache = new Map<string, { expiresAt: number; output: Promise<WeatherOutput> }>();
   const maxEntries = Math.max(1, Math.min(500, dependencies.maxEntries ?? 500));
   const fetchWeather = dependencies.fetch ?? ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args));
   const now = dependencies.now ?? (() => new Date());
@@ -60,10 +65,14 @@ export function createWeatherTool(dependencies: {
     const startDate = localDate(query.start);
     const endDate = localDate(query.end);
     const key = `${query.latitude.toFixed(3)},${query.longitude.toFixed(3)},${startDate},${endDate}`;
+    const fallbackKey = `${key},${query.start},${query.end}`;
     const nowMs = now().getTime();
     let entry = cache.get(key);
 
     for (const [cacheKey, cached] of cache) if (cached.expiresAt <= nowMs) cache.delete(cacheKey);
+    for (const [cacheKey, cached] of fallbackCache) if (cached.expiresAt <= nowMs) fallbackCache.delete(cacheKey);
+    const fallbackEntry = fallbackCache.get(fallbackKey);
+    if (fallbackEntry) return fallbackEntry.output;
     if (!entry || entry.expiresAt <= nowMs) {
       const url = new URL("https://api.open-meteo.com/v1/forecast");
       url.searchParams.set("latitude", String(query.latitude));
@@ -97,11 +106,23 @@ export function createWeatherTool(dependencies: {
 
     const startMs = Date.parse(query.start);
     const endMs = Date.parse(query.end);
-    const hourly = (await entry.hourly).filter(({ time }) => {
-      const hourMs = Date.parse(`${time}+08:00`);
-      return hourMs >= startMs && hourMs < endMs;
-    });
-    if (hourly.length === 0) throw new AgentToolError("WEATHER_UNAVAILABLE", true);
-    return { source: "open-meteo", hourly };
+    try {
+      const hourly = (await entry.hourly).filter(({ time }) => {
+        const hourMs = Date.parse(`${time}+08:00`);
+        return hourMs >= startMs && hourMs < endMs;
+      });
+      if (hourly.length === 0) throw new AgentToolError("WEATHER_UNAVAILABLE", true);
+      return { source: "open-meteo", hourly };
+    } catch {
+      const pending = fallbackCache.get(fallbackKey);
+      if (pending) return pending.output;
+      const output = fetchQWeather(query, dependencies.env ?? process.env, fetchWeather, now())
+        .catch(() => { throw new AgentToolError("WEATHER_UNAVAILABLE", true); });
+      const inserted = { expiresAt: nowMs + CACHE_TTL_MS, output };
+      if (fallbackCache.size >= maxEntries) fallbackCache.delete(fallbackCache.keys().next().value!);
+      fallbackCache.set(fallbackKey, inserted);
+      void output.catch(() => { if (fallbackCache.get(fallbackKey) === inserted) fallbackCache.delete(fallbackKey); });
+      return output;
+    }
   };
 }

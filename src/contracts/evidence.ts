@@ -4,7 +4,8 @@ import { PublicConstraintCodeSchema } from "./agent";
 const number = z.number().finite();
 const count = number.int().nonnegative();
 export const WeatherEvidenceSchema = z.object({
-  source: z.literal("open-meteo"), reference: z.literal("上海"),
+  source: z.enum(["open-meteo", "qweather"]), reference: z.literal("上海"),
+  attributions: z.array(z.string()).optional(),
   interval: z.object({ start: z.string().datetime({ offset: true }), end: z.string().datetime({ offset: true }) }),
   hourlyCount: count, temperatureMinC: number.nullable(), temperatureMaxC: number.nullable(),
   maxPrecipitationProbability: number.min(0).max(100).nullable(),

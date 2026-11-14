@@ -41,7 +41,10 @@ export function localFunctions(): Plugin {
     apply: "serve",
     configureServer(server) {
       const { mode, envDir } = server.config;
-      const env = loadEnv(mode, envDir, "DEEPSEEK_");
+      const env = loadEnv(mode, envDir, ["DEEPSEEK_", "QWEATHER_"]);
+      let planHandler: Promise<Handler> | undefined;
+      const getPlanHandler = () => planHandler ??= server.ssrLoadModule("/netlify/functions/plan.ts")
+        .then((module) => (module.createPlanHandler as (options: { env: Record<string, string> }) => Handler)({ env }));
       server.middlewares.use((incoming, outgoing, next) => {
         const url = new URL(incoming.url ?? "/", "http://localhost");
         if (url.pathname !== planPath && url.pathname !== replanPath) {
@@ -51,10 +54,7 @@ export function localFunctions(): Plugin {
         const execute = async () => {
           const request = toRequest(incoming, url);
           if (url.pathname === planPath) {
-            const { createPlanHandler } = await server.ssrLoadModule("/netlify/functions/plan.ts") as {
-              createPlanHandler: (options: { env: Record<string, string> }) => Handler;
-            };
-            return createPlanHandler({ env })(request);
+            return (await getPlanHandler())(request);
           }
           const { default: replan } = await server.ssrLoadModule("/netlify/functions/replan.ts") as { default: Handler };
           return replan(request);
