@@ -18,6 +18,7 @@
     "vite.config.ts",
     "scripts/local-functions.ts",
     "scripts/server.ts",
+    "server/**/*.ts",
     "netlify/functions/**/*.ts",
     "src/contracts/**/*.ts",
     "src/demo/demoRun.ts",

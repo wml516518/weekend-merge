@@ -6,15 +6,16 @@ import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import planHandler from "../netlify/functions/plan";
-import replanHandler from "../netlify/functions/replan";
+import { createGroupRuntime } from "../server/groups/runtime";
 
-const planPath = "/.netlify/functions/plan";
-const replanPath = "/.netlify/functions/replan";
 const staticRoot = resolve(process.env.STATIC_ROOT ?? "dist");
-const trustedProxyDepth = Math.max(1, Number(process.env.TRUSTED_PROXY_DEPTH ?? 1));
+const trustedProxyDepth = Number(process.env.TRUSTED_PROXY_DEPTH ?? 1);
+if (!Number.isInteger(trustedProxyDepth) || trustedProxyDepth < 1 || trustedProxyDepth > 5) throw new Error("INVALID_PROXY_DEPTH");
 const host = process.env.HOST ?? "127.0.0.1";
 const port = Number(process.env.PORT ?? 8787);
+const publicOrigin = process.env.PUBLIC_ORIGIN;
+const groups = createGroupRuntime({ publicOrigin, development: process.env.NODE_ENV === "development" });
+const canonicalOrigin = new URL(publicOrigin!).origin;
 
 const contentTypeByExtension: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -77,7 +78,9 @@ function clientKey(incoming: IncomingMessage): string {
     ? incoming.headers["x-forwarded-for"]
     : [incoming.headers["x-forwarded-for"] ?? ""];
   const forwardedAddresses = forwardedValues.join(",").split(",").map((value) => value.trim()).filter(Boolean);
-  const trustedIp = forwardedAddresses.at(-trustedProxyDepth) ?? String(incoming.socket.remoteAddress ?? "unknown");
+  const peer = String(incoming.socket.remoteAddress ?? "unknown");
+  const localProxy = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer);
+  const trustedIp = (localProxy ? forwardedAddresses.at(-trustedProxyDepth) : undefined) ?? peer;
   return createHash("sha256").update(trustedIp).digest("hex").slice(0, 32);
 }
 
@@ -108,7 +111,8 @@ const server = createServer((incoming, target) => {
   target.setHeader("x-request-id", requestId);
   let url: URL;
   try {
-    url = new URL(incoming.url ?? "/", `http://${incoming.headers.host ?? `${host}:${port}`}`);
+    url = new URL(incoming.url ?? "/", canonicalOrigin);
+    if (url.origin !== canonicalOrigin) return jsonError(target, 400, "INVALID_REQUEST", "请求地址不正确。");
   } catch {
     return jsonError(target, 400, "INVALID_REQUEST", "Invalid request URL.");
   }
@@ -118,7 +122,7 @@ const server = createServer((incoming, target) => {
       at: new Date().toISOString(),
       durationMs: Math.round(elapsedMs),
       method: incoming.method,
-      path: url.pathname,
+      path: url.pathname === "/healthz" ? "/healthz" : url.pathname.startsWith("/api/") ? "/api" : url.pathname.startsWith("/.netlify/functions/") ? "/.netlify/functions" : "/static",
       requestId,
       status: target.statusCode,
     }));
@@ -130,20 +134,13 @@ const server = createServer((incoming, target) => {
     target.end(incoming.method === "HEAD" ? undefined : JSON.stringify({ status: "ok", release: process.env.APP_RELEASE || "local" }));
     return;
   }
-  if (url.pathname !== planPath && url.pathname !== replanPath) {
-    serveStatic(target, url.pathname);
-    return;
-  }
-  if (incoming.method !== "POST") {
-    return jsonError(target, 405, "METHOD_NOT_ALLOWED", "Use POST to call this API.");
-  }
   const execute = async () => {
     const request = toRequest(incoming, url);
-    request.headers.set("x-nf-client-connection-ip", clientKey(incoming));
-    return url.pathname === planPath ? planHandler(request) : replanHandler(request);
+    return groups.handle(request, clientKey(incoming));
   };
   void execute()
     .then(async (response) => {
+      if (!response) { serveStatic(target, url.pathname); return; }
       for (const [name, value] of [
         ["Permissions-Policy", "camera=(), microphone=(), geolocation=()"],
         ["Referrer-Policy", "strict-origin-when-cross-origin"],
@@ -151,14 +148,20 @@ const server = createServer((incoming, target) => {
       ] as const) response.headers.set(name, value);
       await sendResponse(response, target);
     })
-    .catch(() => jsonError(target, 500, "PLANNING_FAILED", "Planning could not be completed.", true));
+    .catch(() => jsonError(target, 500, "PLANNING_FAILED", "服务暂时无法完成操作，请稍后重试。", true));
 });
 
 server.headersTimeout = 70_000;
 server.keepAliveTimeout = 65_000;
 server.requestTimeout = 75_000;
-process.on("SIGTERM", () => server.close(() => process.exit(0)));
-process.on("SIGINT", () => server.close(() => process.exit(0)));
+let shuttingDown = false;
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  server.close(() => { void groups.close().then(() => process.exit(0)); });
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 server.listen(port, host, () => {
   console.info(`weekend-merge server listening on http://${host}:${port}`);
 });
