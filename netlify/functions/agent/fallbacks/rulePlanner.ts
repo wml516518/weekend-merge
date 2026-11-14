@@ -1,12 +1,11 @@
-import { ItinerarySchema, type Itinerary, type PlanRequest } from "../../../../src/contracts/agent";
+import { getParticipants, ItinerarySchema, type Itinerary, type PlanRequest } from "../../../../src/contracts/agent";
 import { calculateBudget } from "../tools/budget";
 import { PlaceListSchema, type Place, type EstimateRouteOutput, type CalculateBudgetInput } from "../tools/contracts";
 import { searchPlaces } from "../tools/places";
-import { effectiveWalkingLimitKm, expandedAvoidTags, interestMatchesTags, violatesAvoidedStop } from "../tools/preferences";
+import { effectiveWalkingLimitKm, expandedAvoidTags, interestCoverage, interestCoverageReason, interestMatchesTags, violatesAvoidedStop } from "../tools/preferences";
 import { estimateRoute } from "../tools/route";
 import { validatePlan, type ValidationCode } from "../tools/validator";
 import type { WeatherOutput } from "../tools/weather";
-import { analyzeConsensus } from "./consensus";
 
 export type RulePlanContext = {
   request: PlanRequest;
@@ -39,7 +38,7 @@ const BUFFER_RATE = 0.1;
 const TRANSIT_ALLOWANCE_PER_PERSON = 4;
 const MAX_COMBINATIONS_PER_STRATEGY = 20;
 
-type Pair = { places: [Place, Place]; route: EstimateRouteOutput; sharedHits: number; interestHits: number; cost: number };
+type Pair = { places: [Place, Place]; route: EstimateRouteOutput; covered: number; support: number; rank: number; interestHits: number; cost: number };
 
 function minutes(time: string): number {
   return Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
@@ -95,16 +94,16 @@ function schedule(pair: Pair, request: PlanRequest, avoided: readonly string[]):
   return undefined;
 }
 
-function pairCost(pair: [Place, Place], route: EstimateRouteOutput, budgetLimit: number): number {
+function pairCost(pair: readonly Place[], route: EstimateRouteOutput, budgetLimit: number, participantCount: number): number {
   const items: CalculateBudgetInput["items"] = pair.map((place) => ({
     category: place.category,
     label: place.name,
     unitPrice: place.priceRange.max,
-    quantity: 2,
+    quantity: participantCount,
   }));
   for (const leg of route.legs) {
     if (leg.mode === "transit") {
-      items.push({ category: "transport", label: "交通预算", unitPrice: TRANSIT_ALLOWANCE_PER_PERSON, quantity: 2 });
+      items.push({ category: "transport", label: "交通预算", unitPrice: TRANSIT_ALLOWANCE_PER_PERSON, quantity: participantCount });
     }
   }
   return calculateBudget({ items, budgetLimit, bufferRate: BUFFER_RATE }).total;
@@ -117,7 +116,7 @@ function comparePairs(strategy: number, a: Pair, b: Pair, startingArea: string,
   const key = (pair: Pair) => pair.places.map((place) => place.placeId).join(",");
   if (preference(b) !== preference(a)) return preference(b) - preference(a);
   if (strategy === 0) {
-    return b.sharedHits - a.sharedHits || b.interestHits - a.interestHits ||
+    return b.support - a.support || b.covered - a.covered || b.rank - a.rank || b.interestHits - a.interestHits ||
       firstArea(b) - firstArea(a) || a.route.totalDistanceKm - b.route.totalDistanceKm || key(a).localeCompare(key(b));
   }
   if (strategy === 1) {
@@ -135,10 +134,11 @@ function pairKey(pair: Pair): string {
 export function createRulePlans(context: RulePlanContext): Itinerary[] {
   const { request, weather } = context;
   const catalog = PlaceListSchema.parse(context.places);
-  const avoided = [...new Set([...request.preferences.a.avoid, ...request.preferences.b.avoid])];
+  const participants = getParticipants(request.preferences);
+  const participantCount = participants.length;
+  const avoided = [...new Set(participants.flatMap((person) => person.preferences.avoid))];
   const searchable = searchPlaces({ excludedTags: expandedAvoidTags(avoided), limit: 50 }, catalog).places;
-  const shared = analyzeConsensus(request).shared;
-  const interests = [...new Set([...request.preferences.a.interests, ...request.preferences.b.interests])];
+  const interests = [...new Set(participants.flatMap((person) => person.preferences.interests))];
   const preferredPlaceIds = new Set(context.preferredPlaceIds ?? []);
   const rainLikely = weather?.hourly.some((hour) => hour.precipitationProbability >= 50) ?? false;
   const pairs: Pair[] = [];
@@ -154,15 +154,15 @@ export function createRulePlans(context: RulePlanContext): Itinerary[] {
       pairs.push({
         places,
         route,
-        sharedHits: places.reduce((sum, place) => sum + shared.filter((interest) => interestMatchesTags(interest, place.tags)).length, 0),
+        ...interestCoverage(participants, places),
         interestHits: places.reduce((sum, place) => sum + interests.filter((interest) => interestMatchesTags(interest, place.tags)).length + (rainLikely && place.indoor ? 1 : 0), 0),
-        cost: pairCost(places, route, request.setup.budget),
+        cost: pairCost(places, route, request.setup.budget, participantCount),
       });
     }
   }
 
   const titles = ["共同兴趣优先", "移动最少", "预算余量优先"] as const;
-  const reasons = ["优先安排双方共同感兴趣的地点", "优先减少地点间移动", "优先保留预算余量"] as const;
+  const reasons = ["优先覆盖更多成员的兴趣", "优先减少地点间移动", "优先保留预算余量"] as const;
   const plans: Itinerary[] = [];
   const usedPairs = new Set<string>();
   const violations = new Set<RulePlanConstraintCode>();
@@ -200,7 +200,7 @@ export function createRulePlans(context: RulePlanContext): Itinerary[] {
         area: place.area,
         startTime: clock(times[index].start),
         endTime: clock(times[index].end),
-        cost: place.priceRange.max * 2,
+        cost: place.priceRange.max * participantCount,
         latitude: place.latitude,
         longitude: place.longitude,
         tags: place.tags,
@@ -210,13 +210,13 @@ export function createRulePlans(context: RulePlanContext): Itinerary[] {
         id: `${request.sessionId}-rule-${strategy + 1}`,
         title,
         summary: `${pair.places[0].name}、${pair.places[1].name}`,
-        matchScore: Math.min(100, 60 + pair.sharedHits * 12 + pair.interestHits * 5),
+        matchScore: Math.min(100, 60 + pair.support * 12 + pair.interestHits * 5),
         totalCost: pair.cost,
         totalDistanceKm: pair.route.totalDistanceKm,
         indoorRatio: pair.places.filter((place) => place.indoor).length * 50,
         transfers: pair.route.legs.filter((leg) => leg.mode === "transit").length,
         stops,
-        reasons: [reasons[strategy], ...(rainLikely && pair.places.every((place) => place.indoor) ? ["预报有降雨可能，安排室内地点"] : [])],
+        reasons: [interestCoverageReason(participants, pair.places), reasons[strategy], ...(rainLikely && pair.places.every((place) => place.indoor) ? ["预报有降雨可能，安排室内地点"] : [])],
       });
       const walkingDistanceKm = pair.route.legs.filter((leg) => leg.mode === "walking")
         .reduce((sum, leg) => sum + leg.distanceKm, 0);

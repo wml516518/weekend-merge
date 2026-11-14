@@ -14,7 +14,7 @@ export const AgentStateSchema = z.enum([
 const StartTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 const EndTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$|^24:00$/);
 
-// Generous protocol ceilings for a local two-person outing, above the setup budget.
+// Generous protocol ceilings for a local group outing, above the setup budget.
 // Every public number must remain finite through JSON serialization.
 const MAX_STOP_COST = 10_000;
 const MAX_PLAN_COST = 100_000;
@@ -37,14 +37,13 @@ export const PlanSetupSchema = z.object({
   date: PlanDateSchema,
   startTime: StartTimeSchema,
   endTime: EndTimeSchema,
-  budget: z.number().finite().min(100).max(2000),
+  budget: z.number().finite().min(100).max(12_000),
   startingArea: ShanghaiAreaSchema,
 }).refine(({ startTime, endTime }) => {
   const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
   const duration = minutes(endTime) - minutes(startTime);
   return duration >= 180 && duration <= 720;
 }, { message: "Duration must be 3 to 12 hours", path: ["endTime"] });
-
 export const ReplanReasonCodeSchema = z.enum([
   "CHANGE_PLACE", "TOO_CROWDED", "TOO_EXPENSIVE", "TOO_MUCH_WALKING", "PREFER_INDOOR", "PREFER_OUTDOOR", "CHANGE_ACTIVITY",
 ]);
@@ -76,6 +75,34 @@ export const ConsensusSummarySchema = z.object({
   conflicts: z.array(z.string()),
   constraints: z.array(z.string()),
 });
+
+export const ParticipantSchema = z.object({
+  id: z.string().min(1).max(80),
+  preferences: PersonPreferencesSchema,
+});
+export type Participant = z.infer<typeof ParticipantSchema>;
+
+const GroupPreferencesSchema = z.object({
+  participants: z.array(ParticipantSchema).min(2).max(6),
+  a: z.never().optional(),
+  b: z.never().optional(),
+}).refine(({ participants }) => new Set(participants.map((person) => person.id)).size === participants.length, {
+  message: "Participant IDs must be unique",
+  path: ["participants"],
+});
+const LegacyPreferencesSchema = z.object({
+  a: PersonPreferencesSchema, b: PersonPreferencesSchema,
+  participants: z.never().optional(),
+});
+export type PlanningPreferences = z.infer<typeof GroupPreferencesSchema> | z.infer<typeof LegacyPreferencesSchema>;
+const PlanPreferencesSchema = z.union([GroupPreferencesSchema, LegacyPreferencesSchema]);
+
+function validateParticipantBudget(request: { preferences: PlanningPreferences; setup: { budget: number } }, context: z.RefinementCtx) {
+  const ceiling = request.preferences.participants ? request.preferences.participants.length * 2000 : 2000;
+  if (request.setup.budget > ceiling) context.addIssue({
+    code: z.ZodIssueCode.custom, path: ["setup", "budget"], message: "Budget exceeds the participant allowance",
+  });
+}
 
 export const ItineraryStopSchema = z.object({
   id: z.string().min(1),
@@ -116,8 +143,8 @@ export const PlanRequestSchema = z.object({
   sessionId: z.string().min(1).max(80),
   mode: z.enum(["live", "demo"]).default("live"),
   setup: PlanSetupSchema,
-  preferences: z.object({ a: PersonPreferencesSchema, b: PersonPreferencesSchema }),
-});
+  preferences: PlanPreferencesSchema,
+}).superRefine(validateParticipantBudget);
 
 export const ReplanRequestSchema = z.object({
   sessionId: z.string().min(1).max(80),
@@ -128,8 +155,16 @@ export const ReplanRequestSchema = z.object({
   reasonCode: ReplanReasonCodeSchema.optional(),
   replanCount: z.number().finite().int().min(0).max(1),
   setup: PlanSetupSchema,
-  preferences: z.object({ a: PersonPreferencesSchema, b: PersonPreferencesSchema }),
-});
+  preferences: PlanPreferencesSchema,
+}).superRefine(validateParticipantBudget);
+
+export function getParticipants(preferences: PlanningPreferences): Participant[] {
+  if (preferences.participants) return preferences.participants;
+  return [
+    { id: "member-1", preferences: preferences.a },
+    { id: "member-2", preferences: preferences.b },
+  ];
+}
 
 export const PlanDiffSchema = z.object({
   replacedStopIds: z.array(z.string()),

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
-import { ItinerarySchema, PlanRequestSchema, ToolNameSchema, type AgentEvent, type Itinerary, type PlanRequest } from "../../../src/contracts/agent";
+import { getParticipants, ItinerarySchema, PlanRequestSchema, ToolNameSchema, type AgentEvent, type Itinerary, type PlanRequest } from "../../../src/contracts/agent";
 import { budgetEvidence, placesEvidence, routeEvidence, toolEvidence, validationEvidence, type CandidateValidation } from "./evidence";
 import type { CalculateBudgetOutput, EstimateRouteOutput } from "./tools/contracts";
 import { encodeAgentEvent } from "./http";
@@ -10,7 +10,7 @@ import { createRulePlans, NoValidPlanError } from "./fallbacks/rulePlanner";
 import { ModelFinalSchema, type AgentModel, type ModelInput } from "./model";
 import { PlaceListSchema, type Place } from "./tools/contracts";
 import { shanghaiPlaces } from "./tools/places";
-import { interestMatchesTags } from "./tools/preferences";
+import { interestCoverageReason, interestMatchesTags } from "./tools/preferences";
 import { parsePlaceSearchInput } from "./tools/placeSearchInput";
 import { createAgentTools, toolInputSchemas, weatherScopeForRequest, type AgentTools } from "./tools/registry";
 import { AgentToolError, type WeatherOutput } from "./tools/weather";
@@ -28,6 +28,7 @@ class PlanningError extends Error {
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 
 function repairFeedback(plans: Itinerary[] | undefined, request: PlanRequest): string[] {
+  const participantCount = getParticipants(request.preferences).length;
   const signatures = (plans ?? []).map(plan =>
     [...new Set(plan.stops.map(stop => stop.placeId))].sort().join(","));
   const duplicates = signatures.filter((signature, index) => signatures.indexOf(signature) !== index);
@@ -36,7 +37,7 @@ function repairFeedback(plans: Itinerary[] | undefined, request: PlanRequest): s
     "Return exactly three plans with different unordered placeId sets; reordering a plan does not make it distinct.",
     ...(duplicates.length ? [`Duplicate placeId sets to replace: ${[...new Set(duplicates)].join(" | ")}`] : []),
     "Use only placeId values returned by search_places and exclude venues whose tags match the original avoid lists.",
-    `The combined budget limit is ${request.setup.budget}. For each plan, sum twice each venue's maximum per-person price, add 8 for each transit leg, apply a 10% buffer, and replace venues if the result is over budget.`,
+    `The combined budget limit is ${request.setup.budget}. For each plan, sum each venue's maximum per-person price times ${participantCount}, add ${participantCount * 4} for each transit leg, apply a 10% buffer, and replace venues if the result is over budget.`,
     "Ensure every stop is open, inside the outing range, has realistic travel time between stops, and stays within the stricter walking cap.",
   ];
 }
@@ -68,13 +69,19 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
     return events;
   }
   const request = parsed.data;
+  const normalizedPreferences = { participants: getParticipants(request.preferences) };
+  const requestForModel = { ...request, preferences: { participants: normalizedPreferences.participants.map((person, index) => ({
+    id: `member-${index + 1}`, preferences: person.preferences,
+  })) } };
   const places = PlaceListSchema.safeParse(dependencies.places ?? shanghaiPlaces);
   if (!places.success) {
     emit({ type: "run.failed", code: "INVALID_CATALOG", message: "Place catalog is invalid" });
     return events;
   }
-  const tools = dependencies.tools ?? createAgentTools({ request, places: places.data, now: dependencies.now });
-  const consensus = analyzeConsensus(request);
+  const tools = dependencies.tools ?? createAgentTools({
+    request: { ...request, preferences: normalizedPreferences }, places: places.data, now: dependencies.now,
+  });
+  const consensus = analyzeConsensus(requestForModel);
   let weather: WeatherOutput | undefined;
   let fallbackReason: string | undefined;
   let useModelGuidedPlanner = false;
@@ -88,7 +95,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
   if (!dependencies.model) fallbackReason = "MODEL_UNAVAILABLE";
   else {
     try {
-      let turn: unknown = await dependencies.model.next({ request, toolResults: [] });
+      let turn: unknown = await dependencies.model.next({ request: requestForModel, toolResults: [] });
       if (!ModelFinalSchema.safeParse(turn).success) {
         const parsedCalls = CallsSchema.safeParse(turn);
         if (!parsedCalls.success) throw new PlanningError("INVALID_MODEL_RESULT");
@@ -131,7 +138,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
         }
         // This is the only second request. A second tool batch is never executed.
         finalResponseRequested = true;
-        turn = await dependencies.model.next({ request, toolResults: modelToolResults });
+        turn = await dependencies.model.next({ request: requestForModel, toolResults: modelToolResults });
       }
       const candidate = ModelFinalSchema.safeParse(turn);
       if (!candidate.success) throw new PlanningError("INVALID_MODEL_RESULT");
@@ -143,7 +150,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
         repairAttempted = true;
         try {
           const repairedTurn = await dependencies.model.next({
-            request,
+            request: requestForModel,
             toolResults: modelToolResults,
             validationFeedback: repairFeedback(undefined, request),
           });
@@ -174,6 +181,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
   }
 
   async function verify(proposals: Itinerary[], fromModel = false): Promise<Itinerary[]> {
+    const participantCount = normalizedPreferences.participants.length;
     if (proposals.length !== 3 || new Set(proposals.map((plan) => plan.id)).size !== 3 ||
       new Set(proposals.map((plan) => plan.stops.map((stop) => stop.placeId).sort().join(","))).size !== 3) {
       throw new PlanningError("INVALID_MODEL_RESULT");
@@ -188,23 +196,30 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
       const planId = fromModel ? `${runId}-candidate-${candidateIndex + 1}` : proposal.id;
       const stops = proposal.stops.map((stop, index) => ({ ...stop,
         id: fromModel ? `${planId}-stop-${index + 1}` : stop.id,
-        name: venues[index].name, area: venues[index].area, cost: venues[index].priceRange.max * 2,
+        name: venues[index].name, area: venues[index].area, cost: venues[index].priceRange.max * participantCount,
         latitude: venues[index].latitude, longitude: venues[index].longitude, tags: venues[index].tags, locked: false,
       }));
       const route = await tools.estimate_route(toolInputSchemas.estimate_route.parse({ stops, mode: "mixed" }));
-      const items = venues.map((place) => ({ category: place.category as string, label: place.name, unitPrice: place.priceRange.max, quantity: 2 }));
+      const items = venues.map((place) => ({ category: place.category as string, label: place.name, unitPrice: place.priceRange.max, quantity: participantCount }));
       for (const leg of route.legs) {
-        if (leg.mode === "transit") items.push({ category: "transport", label: "交通预算", unitPrice: 4, quantity: 2 });
+        if (leg.mode === "transit") items.push({ category: "transport", label: "交通预算", unitPrice: 4, quantity: participantCount });
       }
       const budget = await tools.calculate_budget(toolInputSchemas.calculate_budget.parse({ items, budgetLimit: request.setup.budget, bufferRate: 0.1 }));
-      const interests = [...new Set([...request.preferences.a.interests, ...request.preferences.b.interests])];
+      const interestSupport = new Map<string, number>();
+      for (const person of normalizedPreferences.participants) {
+        for (const interest of person.preferences.interests) interestSupport.set(interest, (interestSupport.get(interest) ?? 0) + 1);
+      }
+      const interests = [...interestSupport.keys()];
       const sharedHits = venues.reduce((sum, venue) => sum + consensus.shared.filter((interest) => interestMatchesTags(interest, venue.tags)).length, 0);
       const interestHits = venues.reduce((sum, venue) => sum + interests.filter((interest) => interestMatchesTags(interest, venue.tags)).length, 0);
       const plan = ItinerarySchema.parse({ ...proposal,
         ...(fromModel ? {
           id: planId, title: `方案 ${candidateIndex + 1}`, summary: venues.map((venue) => venue.name).join("、"),
           matchScore: Math.min(100, 60 + sharedHits * 12 + interestHits * 5),
-          reasons: ["已核对地点、时间、路线和预算"],
+          reasons: [
+            interestCoverageReason(normalizedPreferences.participants, venues),
+            "已核对地点、时间、路线和预算",
+          ],
         } : {}),
         stops, totalCost: budget.total, totalDistanceKm: route.totalDistanceKm,
         indoorRatio: venues.filter((place) => place.indoor).length / venues.length * 100,
@@ -245,7 +260,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
         repairAttempted = true;
         try {
           const repairedTurn = await dependencies.model.next({
-            request,
+            request: requestForModel,
             toolResults: modelToolResults,
             validationFeedback: repairFeedback(final.plans, request),
           });
@@ -262,9 +277,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
     }
   }
   if (!verified) {
-    if (!useModelGuidedPlanner) {
-      emit({ type: "run.degraded", reason: fallbackReason ?? "INVALID_MODEL_RESULT", fallback: "rule-planner" });
-    }
+    emit({ type: "run.degraded", reason: fallbackReason ?? "INVALID_MODEL_RESULT", fallback: "rule-planner" });
     try {
       verified = await verify(createRulePlans({
         request,
