@@ -27,6 +27,20 @@ class PlanningError extends Error {
 
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
 
+function repairFeedback(plans: Itinerary[] | undefined, request: PlanRequest): string[] {
+  const signatures = (plans ?? []).map(plan =>
+    [...new Set(plan.stops.map(stop => stop.placeId))].sort().join(","));
+  const duplicates = signatures.filter((signature, index) => signatures.indexOf(signature) !== index);
+  return [
+    "The previous final JSON failed server-side semantic verification.",
+    "Return exactly three plans with different unordered placeId sets; reordering a plan does not make it distinct.",
+    ...(duplicates.length ? [`Duplicate placeId sets to replace: ${[...new Set(duplicates)].join(" | ")}`] : []),
+    "Use only placeId values returned by search_places and exclude venues whose tags match the original avoid lists.",
+    `The combined budget limit is ${request.setup.budget}. For each plan, sum twice each venue's maximum per-person price, add 8 for each transit leg, apply a 10% buffer, and replace venues if the result is over budget.`,
+    "Ensure every stop is open, inside the outing range, has realistic travel time between stops, and stays within the stricter walking cap.",
+  ];
+}
+
 export async function runPlanningAgent(input: PlanRequest, dependencies: {
   model?: AgentModel;
   onEvent?: (event: AgentEvent) => void;
@@ -63,7 +77,11 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
   const consensus = analyzeConsensus(request);
   let weather: WeatherOutput | undefined;
   let fallbackReason: string | undefined;
+  let useModelGuidedPlanner = false;
+  let finalResponseRequested = false;
+  let repairAttempted = false;
   let final: z.infer<typeof ModelFinalSchema> | undefined;
+  const modelToolResults: ModelInput["toolResults"] = [];
   step("ANALYZE");
   step("GATHER");
 
@@ -74,13 +92,12 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
       if (!ModelFinalSchema.safeParse(turn).success) {
         const parsedCalls = CallsSchema.safeParse(turn);
         if (!parsedCalls.success) throw new PlanningError("INVALID_MODEL_RESULT");
-        const results: ModelInput["toolResults"] = [];
         const ids = new Set<string>();
         for (const [index, call] of parsedCalls.data.entries()) {
           let code: string | undefined;
           const name = ToolNameSchema.safeParse(call.name);
           let args: unknown;
-          if (index >= 6) code = "TOOL_LIMIT_EXCEEDED";
+          if (index >= 8) code = "TOOL_LIMIT_EXCEEDED";
           else if (!name.success) code = "UNKNOWN_TOOL";
           else if (ids.has(call.id)) code = "DUPLICATE_TOOL_CALL_ID";
           else {
@@ -101,7 +118,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
             // Parse even injected tools' inputs; no dynamic property outside the whitelist.
             const execute = tools[tool] as (input: unknown) => unknown | Promise<unknown>;
             const output = await execute(args);
-            results.push({ id: call.id, ...(call.wireId ? { wireId: call.wireId } : {}), name: tool, output });
+            modelToolResults.push({ id: call.id, ...(call.wireId ? { wireId: call.wireId } : {}), name: tool, output });
             if (tool === "get_weather") weather = output as WeatherOutput;
             emit({ type: "tool.completed", tool, summary: toolEvidence(tool, output, request, places.data, `tool-candidate-${index + 1}`), durationMs: Math.max(0, Math.round(now().getTime() - started)), source: tool === "get_weather" ? (output as WeatherOutput).source : tool === "search_places" ? "curated-shanghai-catalog" : "local" });
           } catch (error) {
@@ -113,7 +130,8 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
           }
         }
         // This is the only second request. A second tool batch is never executed.
-        turn = await dependencies.model.next({ request, toolResults: results });
+        finalResponseRequested = true;
+        turn = await dependencies.model.next({ request, toolResults: modelToolResults });
       }
       const candidate = ModelFinalSchema.safeParse(turn);
       if (!candidate.success) throw new PlanningError("INVALID_MODEL_RESULT");
@@ -121,6 +139,21 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
     } catch (error) {
       if (deliveryFailed) throw error;
       fallbackReason = error instanceof PlanningError ? error.code : "MODEL_UNAVAILABLE";
+      if (finalResponseRequested && dependencies.model && modelToolResults.length > 0) {
+        repairAttempted = true;
+        try {
+          const repairedTurn = await dependencies.model.next({
+            request,
+            toolResults: modelToolResults,
+            validationFeedback: repairFeedback(undefined, request),
+          });
+          const repaired = ModelFinalSchema.safeParse(repairedTurn);
+          if (repaired.success) final = repaired.data;
+          else fallbackReason = "INVALID_MODEL_RESULT";
+        } catch {
+          fallbackReason = "INVALID_MODEL_RESULT";
+        }
+      }
     }
   }
 
@@ -198,13 +231,49 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
 
   let verified: Itinerary[] | undefined;
   if (final) {
-    try { verified = await verify(final.plans, true); }
-    catch (error) { if (deliveryFailed) throw error; fallbackReason = "INVALID_MODEL_RESULT"; }
+    try {
+      verified = await verify(final.plans, true);
+    } catch (error) {
+      if (deliveryFailed) throw error;
+      const initialFailure = error instanceof PlanningError ? error.code : "INVALID_MODEL_RESULT";
+      if (repairAttempted) {
+        fallbackReason = initialFailure;
+        useModelGuidedPlanner = true;
+      } else if (!dependencies.model || modelToolResults.length === 0) {
+        fallbackReason = initialFailure;
+      } else {
+        repairAttempted = true;
+        try {
+          const repairedTurn = await dependencies.model.next({
+            request,
+            toolResults: modelToolResults,
+            validationFeedback: repairFeedback(final.plans, request),
+          });
+          const repaired = ModelFinalSchema.safeParse(repairedTurn);
+          if (!repaired.success) throw new PlanningError("INVALID_MODEL_RESULT");
+          final = repaired.data;
+          verified = await verify(final.plans, true);
+        } catch (repairError) {
+          if (deliveryFailed) throw repairError;
+          fallbackReason = repairError instanceof PlanningError ? repairError.code : "INVALID_MODEL_RESULT";
+          useModelGuidedPlanner = Boolean(final);
+        }
+      }
+    }
   }
   if (!verified) {
-    emit({ type: "run.degraded", reason: fallbackReason ?? "INVALID_MODEL_RESULT", fallback: "rule-planner" });
+    if (!useModelGuidedPlanner) {
+      emit({ type: "run.degraded", reason: fallbackReason ?? "INVALID_MODEL_RESULT", fallback: "rule-planner" });
+    }
     try {
-      verified = await verify(createRulePlans({ request, places: places.data, weather }));
+      verified = await verify(createRulePlans({
+        request,
+        places: places.data,
+        weather,
+        ...(useModelGuidedPlanner && final
+          ? { preferredPlaceIds: [...new Set(final.plans.flatMap(plan => plan.stops.map(stop => stop.placeId)))] }
+          : {}),
+      }));
     } catch (error) {
       if (deliveryFailed) throw error;
       emitVerification();

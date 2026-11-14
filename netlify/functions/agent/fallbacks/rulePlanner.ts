@@ -12,6 +12,7 @@ export type RulePlanContext = {
   request: PlanRequest;
   places: readonly Place[];
   weather?: WeatherOutput;
+  preferredPlaceIds?: readonly string[];
 };
 
 export type RulePlanConstraintCode = ValidationCode | "INSUFFICIENT_CANDIDATES";
@@ -109,9 +110,12 @@ function pairCost(pair: [Place, Place], route: EstimateRouteOutput, budgetLimit:
   return calculateBudget({ items, budgetLimit, bufferRate: BUFFER_RATE }).total;
 }
 
-function comparePairs(strategy: number, a: Pair, b: Pair, startingArea: string): number {
+function comparePairs(strategy: number, a: Pair, b: Pair, startingArea: string,
+  preferredPlaceIds: ReadonlySet<string>): number {
   const firstArea = (pair: Pair) => pair.places[0].area === startingArea ? 1 : 0;
+  const preference = (pair: Pair) => pair.places.filter((place) => preferredPlaceIds.has(place.placeId)).length;
   const key = (pair: Pair) => pair.places.map((place) => place.placeId).join(",");
+  if (preference(b) !== preference(a)) return preference(b) - preference(a);
   if (strategy === 0) {
     return b.sharedHits - a.sharedHits || b.interestHits - a.interestHits ||
       firstArea(b) - firstArea(a) || a.route.totalDistanceKm - b.route.totalDistanceKm || key(a).localeCompare(key(b));
@@ -135,6 +139,7 @@ export function createRulePlans(context: RulePlanContext): Itinerary[] {
   const searchable = searchPlaces({ excludedTags: expandedAvoidTags(avoided), limit: 50 }, catalog).places;
   const shared = analyzeConsensus(request).shared;
   const interests = [...new Set([...request.preferences.a.interests, ...request.preferences.b.interests])];
+  const preferredPlaceIds = new Set(context.preferredPlaceIds ?? []);
   const rainLikely = weather?.hourly.some((hour) => hour.precipitationProbability >= 50) ?? false;
   const pairs: Pair[] = [];
 
@@ -168,7 +173,7 @@ export function createRulePlans(context: RulePlanContext): Itinerary[] {
   else if (pairs.length === 0) violations.add("WALKING_LIMIT_EXCEEDED");
 
   for (const [strategy, title] of titles.entries()) {
-    const ranked = [...pairs].sort((a, b) => comparePairs(strategy, a, b, request.setup.startingArea));
+    const ranked = [...pairs].sort((a, b) => comparePairs(strategy, a, b, request.setup.startingArea, preferredPlaceIds));
     let selected = false;
     for (const pair of ranked.slice(0, MAX_COMBINATIONS_PER_STRATEGY)) {
       const signature = pairKey(pair);

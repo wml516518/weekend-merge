@@ -78,6 +78,65 @@ describe("DeepSeek server adapter", () => {
     });
   });
 
+  it("normalizes model-provided ISO stop times to the HH:MM itinerary contract", async () => {
+    const model = createDeepSeekModel({ apiKey: "test-only", fetch: async () => apiResponse({
+      content: JSON.stringify({
+        type: "final",
+        consensus: { shared: [], conflicts: [], constraints: [] },
+        plans: [{
+          id: "plan-a",
+          stops: [
+            { placeId: "west-bund", startTime: "2026-11-15T13:30:00+08:00", endTime: "2026-11-15T15:00:00+08:00" },
+            { placeId: "cafe", startTime: "2026-11-15T05:30:00Z", endTime: "2026-11-15T07:00:00Z" },
+          ],
+        }],
+      }),
+    }) });
+
+    expect(await model.next({ request, toolResults: [] })).toMatchObject({
+      type: "final",
+      plans: [{
+        stops: [
+          { startTime: "13:30", endTime: "15:00" },
+          { startTime: "13:30", endTime: "15:00" },
+        ],
+      }],
+    });
+  });
+
+  it("reuses the tool conversation for one validation repair request", async () => {
+    const requests: Array<Record<string, unknown>> = [];
+    const fetcher: typeof fetch = async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      requests.push(body);
+      if (requests.length === 1) return apiResponse({ tool_calls: [
+        { id: "call-places", type: "function", function: { name: "search_places", arguments: '{"limit":4}' } },
+      ] }, "tool_calls");
+      return apiResponse({ content: '{"type":"final","consensus":{"shared":[],"conflicts":[],"constraints":[]},"plans":[]}' });
+    };
+    const model = createDeepSeekModel({ apiKey: "test-only", fetch: fetcher });
+    await model.next({ request, toolResults: [] });
+    await model.next({ request, toolResults: [
+      { id: "internal-1-1", wireId: "call-places", name: "search_places", output: { places: [] } },
+    ] });
+    await expect(model.next({
+      request,
+      toolResults: [{ id: "internal-1-1", wireId: "call-places", name: "search_places", output: { places: [] } }],
+      validationFeedback: ["The previous final failed verification."],
+    })).resolves.toMatchObject({ type: "final" });
+
+    expect(requests).toHaveLength(3);
+    expect(requests[2].messages).toEqual([
+      expect.objectContaining({ role: "system" }),
+      expect.objectContaining({ role: "user" }),
+      expect.objectContaining({ role: "assistant", tool_calls: expect.any(Array) }),
+      { role: "tool", tool_call_id: "call-places", content: JSON.stringify({ places: [] }) },
+      expect.objectContaining({ role: "assistant", content: expect.stringContaining('"type":"final"') }),
+      expect.objectContaining({ role: "user", content: expect.stringContaining("The previous final failed verification.") }),
+    ]);
+    expect(requests[2].tools).toBeUndefined();
+  });
+
   it.each([
     ["HTTP failure", async () => new Response("upstream secret body", { status: 429 })],
     ["malformed response", async () => apiResponse({ content: "not-json" })],

@@ -213,7 +213,7 @@ Weekend Merge 是一个双人周末决策 Agent。两位用户分别提交预算
 - Agent 是受控状态机，不允许模型无限自主循环。
 - 模型负责分析、组合和解释；代码负责事实、计算、约束和状态流转。
 - 所有模型输出通过 JSON Schema 校验。
-- 初始规划最多 2 次模型请求和 6 次工具调用。
+- 初始规划最多 3 次模型请求（工具收集、最终提案、可选一次验证修复）和 8 次工具调用；修复时不得再触发工具。
 - 每轮重排最多 1 次模型请求，重排最多 2 轮。
 
 ### 6.2 状态机
@@ -490,7 +490,7 @@ type AgentEvent =
 - 测试：Vitest、Testing Library、Playwright。
 - 部署：Netlify。
 
-默认模型为 `deepseek-flash`，可通过 `DEEPSEEK_MODEL` 覆盖。DeepSeek API 按 Token 计费，不描述为永久免费；无 Key 或模型不可用时自动使用规则模式。
+默认模型为 `deepseek-flash`，可通过 `DEEPSEEK_MODEL` 覆盖。DeepSeek API 按 Token 计费，不描述为永久免费；无 Key 或模型不可用时自动使用规则模式。模型最终方案未通过校验时会先根据结构化反馈修正一次，再由服务端重算路线、预算和硬约束。
 
 ### 10.2 仓库结构
 
