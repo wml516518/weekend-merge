@@ -320,6 +320,24 @@ describe("controlled planning orchestrator", () => {
     expect(JSON.stringify(details)).not.toMatch(/private wish|untrusted/);
   });
 
+  it("tells a six-person repair that the participant budget is per group, not per plan", async () => {
+    const oversized = { ...request, setup: { ...request.setup, budget: 240, startingArea: "徐汇滨江" } };
+    const overBudget = structuredClone(plans).map(plan => ({
+      ...plan, stops: plan.stops.map(stop => stop.placeId === "venue-0" ? { ...stop, placeId: "venue-3" } : stop),
+    }));
+    const script = scripted([weatherCall, { ...final, plans: overBudget }, final]);
+    const events = await runPlanningAgent(oversized, { now, places, model: script.model,
+      tools: createAgentTools({ request: oversized, places, weather: async () => weather }) });
+
+    expect(script.inputs[2].validationFeedback).toContain("This group has 6 participants in total; the 240 yuan limit applies to all participants together. Plans are distinct venue combinations, not per-person budgets.");
+    expect(script.inputs[2].validationFeedback).toEqual(expect.arrayContaining([
+      expect.stringContaining('"candidate":1'),
+      expect.stringContaining('"totalCost":660'),
+    ]));
+    expect(events.some(event => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events).map(plan => plan.totalCost)).toEqual([66, 88, 110]);
+  });
+
   it("uses request-scoped Shanghai weather for model results and fallback", async () => {
     const scopes: unknown[] = [];
     const tools = createAgentTools({ request, places, weather: async (scope) => {
