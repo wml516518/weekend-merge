@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type SetStateAction } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,14 +42,24 @@ export function PreferenceStep({
   onBack,
   initial,
   setup,
+  headcount = 2,
+  groupControls,
 }: {
-  person: "A" | "B";
+  person: string;
   onSubmit: (p: PersonPreferences) => void;
   onBack?: () => void;
   initial?: PersonPreferences;
   setup?: PlanSetup;
+  headcount?: number;
+  groupControls?: {
+    busy: boolean;
+    onDirty: () => void;
+    onSaveDraft: (p: PersonPreferences) => void;
+    changed: boolean;
+    onSync: () => void;
+  };
 }) {
-  const [draft, setDraft] = useState<PersonPreferences>(
+  const [draft, setDraftState] = useState<PersonPreferences>(
     initial ?? {
       interests: [],
       pace: "轻松",
@@ -61,6 +71,10 @@ export function PreferenceStep({
       wish: "",
     },
   );
+  function setDraft(value: SetStateAction<PersonPreferences>) {
+    groupControls?.onDirty();
+    setDraftState(value);
+  }
   const [backConfirm, setBackConfirm] = useState(false);
   const toggleInterest = (value: PersonPreferences["interests"][number]) =>
     setDraft((old) => ({
@@ -93,18 +107,19 @@ export function PreferenceStep({
       <aside className="wizard-intro">
         <Tag>
           <EyeOff size={13} />
-          独立填写 · 提交后隐藏
+          {groupControls ? "独立填写 · 仅本人可见" : "独立填写 · 提交后隐藏"}
         </Tag>
         <h1 aria-label={`${person} 的周末偏好`}>
           你好，{person}。<br />
           这个周末，你想怎么过？
         </h1>
         <p>
-          先听见自己的期待，再找到两个人的交集。
+          先听见自己的期待，再找到
+          {groupControls ? `${headcount} 个人` : "两个人"}的交集。
           <br />
           你的答案暂时只属于你。
         </p>
-        <div className={`person-art person-${person.toLowerCase()}`}>
+        <div className={`person-art person-${person === "B" ? "b" : "a"}`}>
           <span>{person}</span>
           <Leaf size={80} />
         </div>
@@ -114,12 +129,25 @@ export function PreferenceStep({
             {dateLabel(setup.date)}
             <br />
             <span>
-              {setup.startTime} — {setup.endTime} · 两人 ¥{setup.budget}
+              {setup.startTime} — {setup.endTime} · {headcount} 人 ¥
+              {setup.budget}
             </span>
           </div>
         )}
       </aside>
       <form className="preferences-card" onSubmit={submit}>
+        {groupControls?.changed && (
+          <div className="group-notice" role="status">
+            服务器草稿已更新。你的编辑已保留，请同步后再保存。
+            <button
+              className="text-button"
+              type="button"
+              onClick={groupControls.onSync}
+            >
+              同步服务器草稿
+            </button>
+          </div>
+        )}
         <fieldset className="plain-fieldset">
           <legend className="section-label">
             01 / 想做些什么 <small>选 1–5 项，按心动程度排序</small>
@@ -296,21 +324,53 @@ export function PreferenceStep({
             <button
               className="text-button"
               type="button"
-              onClick={() => (person === "B" ? setBackConfirm(true) : onBack())}
+              onClick={() =>
+                !groupControls && person === "B"
+                  ? setBackConfirm(true)
+                  : onBack()
+              }
             >
               <ArrowLeft size={15} />
-              上一步
+              {groupControls ? "返回大厅" : "上一步"}
             </button>
           ) : (
             <span />
           )}
+          {groupControls && (
+            <button
+              className="button secondary"
+              type="button"
+              disabled={
+                !draft.interests.length ||
+                groupControls.busy ||
+                groupControls.changed
+              }
+              onClick={() => groupControls.onSaveDraft(draft)}
+            >
+              保存我的草稿
+            </button>
+          )}
           <button
             className="button primary"
             type="submit"
-            disabled={!draft.interests.length}
-            aria-label={person === "A" ? "隐藏答案" : "保存并揭晓共识"}
+            disabled={
+              !draft.interests.length ||
+              groupControls?.busy ||
+              groupControls?.changed
+            }
+            aria-label={
+              groupControls
+                ? "提交我的偏好"
+                : person === "A"
+                  ? "隐藏答案"
+                  : "保存并揭晓共识"
+            }
           >
-            {person === "A" ? "保存，交给另一位" : "保存，看看我们的交集"}
+            {groupControls
+              ? "提交我的偏好"
+              : person === "A"
+                ? "保存，交给另一位"
+                : "保存，看看我们的交集"}
             <ArrowRight size={16} />
           </button>
         </div>
