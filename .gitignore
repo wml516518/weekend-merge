@@ -11,3 +11,10 @@ output/
 *.tsbuildinfo
 .DS_Store
 .deploy/
+data-runtime/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite*.bak
+*.sqlite*.backup
+*.recovery.json
