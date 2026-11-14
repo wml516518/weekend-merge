@@ -294,6 +294,32 @@ describe("controlled planning orchestrator", () => {
     expect(candidates(events).every((plan) => plan.id.startsWith("plan-"))).toBe(true);
   });
 
+  it("returns actual canonical costs for every rejected candidate to the single repair request", async () => {
+    const limited = { ...request, setup: { ...request.setup, budget: 120 } };
+    const catalog = places.map((place, index) => index === 3 ? { ...place, priceRange: { min: 100, max: 100 } } : place);
+    const expensive = structuredClone(plans);
+    expensive[0].stops[1].placeId = "venue-3";
+    expensive[1].stops[0].placeId = "venue-1";
+    expensive[1].stops[1].placeId = "venue-3";
+    const script = scripted([weatherCall, { ...final, plans: expensive }, final]);
+    const events = await runPlanningAgent(limited, { now, places: catalog, model: script.model,
+      tools: createAgentTools({ request: limited, places: catalog, weather: async () => weather }) });
+
+    const details = (script.inputs[2].validationFeedback ?? []).flatMap(line => {
+      try { return [JSON.parse(line)]; } catch { return []; }
+    });
+    expect(details).toEqual(expect.arrayContaining([
+      expect.objectContaining({ candidate: 1, budgetLimit: 120, totalCost: 242,
+        venues: [{ placeId: "venue-0", maxPricePerPerson: 10, quantity: 2 }, { placeId: "venue-3", maxPricePerPerson: 100, quantity: 2 }],
+        violations: expect.arrayContaining([expect.objectContaining({ code: "BUDGET_EXCEEDED" })]) }),
+      expect.objectContaining({ candidate: 2, budgetLimit: 120, totalCost: 264 }),
+    ]));
+    expect(script.inputs).toHaveLength(3);
+    expect(events.some(event => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events).map(plan => plan.totalCost)).toEqual([66, 88, 110]);
+    expect(JSON.stringify(details)).not.toMatch(/private wish|untrusted/);
+  });
+
   it("uses request-scoped Shanghai weather for model results and fallback", async () => {
     const scopes: unknown[] = [];
     const tools = createAgentTools({ request, places, weather: async (scope) => {
