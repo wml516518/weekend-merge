@@ -108,6 +108,15 @@ expect(started[0].snapshot.preferences).not.toEqual(started[1].snapshot.preferen
 
 **Interfaces:** Existing App retains demo and share decoding; default live UI uses GroupApp. Client matches Task 3 API, `credentials:'same-origin'`, fragment invite/recover exchange through POST with history replaceState to remove credential. Use own member ID only for granted same-device switch; group state keyed by server ID/revision. Keep form labels accessible and existing design tokens/typography. Reuse itinerary/map/event renderers when compatible, but never invoke old public live endpoints from group pages.
 
+**Visual direction:** Continue the established outing-planner identity rather than redesign it: paper `#fffefa`, ink `#303c33`, moss `#354e44`, light moss `#e5ecd9`, secondary ink `#8a8e82`, rule `#e4e6dc`. Display uses existing Noto Serif SC/Songti SC, body DM Sans/Microsoft YaHei, data inherits body with tabular numerals. The distinguishing interaction is a row/grid of exactly the group's target seats, filling with each named participant's submission state; the layout encodes actual group readiness. Desktop places common outing details beside members/own action, mobile stacks common details → seats → own action. Compare a generic numeric dashboard with this seat layout: prefer seats because users need to identify who has submitted, with a textual submitted count for accessibility. No new external fonts, stock hero, animated decoration or ornamental counters.
+
+```text
+Group name / shared date·time·area             My plans
+Common budget / expiry     [member ✓] [member pending] [empty seat]
+Invite / recover controls  My preference action + submission count
+Persistent planning events → three candidates → owner selection
+```
+
 - [ ] Write failing UI tests: create 2/6 group adjusts default/max total budget and shows per-person; invitation joins independently; submitting one waits and final submit shows queue; new group has blank preferences; switch own member/group/revision remounts blank or own server draft only; recovery error; nonowner cannot select/replan/finalize; selected/final plan synchronizes from server. Add store regression proving saveSetup clears previous a/b data.
 
 ```ts
