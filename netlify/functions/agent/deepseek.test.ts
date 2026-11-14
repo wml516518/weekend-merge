@@ -86,8 +86,8 @@ describe("DeepSeek server adapter", () => {
         plans: [{
           id: "plan-a",
           stops: [
-            { placeId: "west-bund", startTime: "2026-11-15T13:30:00+08:00", endTime: "2026-11-15T15:00:00+08:00" },
-            { placeId: "cafe", startTime: "2026-11-15T05:30:00Z", endTime: "2026-11-15T07:00:00Z" },
+            { placeId: "west-bund", startTime: "2026-11-14T13:30:00+08:00", endTime: "2026-11-14T15:00:00+08:00" },
+            { placeId: "cafe", startTime: "2026-11-14T05:30:00Z", endTime: "2026-11-14T07:00:00Z" },
           ],
         }],
       }),

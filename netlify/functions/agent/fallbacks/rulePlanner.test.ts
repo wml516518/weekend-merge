@@ -22,7 +22,7 @@ const request: PlanRequest = {
       avoid: ["排队"], wish: "",
     },
     b: {
-      interests: ["展览", "书店"], pace: "充实", walkingLimitKm: 5,
+      interests: ["展览", "逛店"], pace: "充实", walkingLimitKm: 5,
       indoorPreference: "户外优先", foodTags: [], budgetStyle: "省钱",
       avoid: [], wish: "",
     },

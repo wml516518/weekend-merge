@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, realpath, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "weekend-deploy-test-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "weekend-deploy-test-")));
   roots.push(root);
   const release = `${"a".repeat(40)}-123-1`;
   const upload = join(root, ".deploy", "uploads", release);
@@ -20,6 +20,8 @@ async function fixture() {
   await writeFile(join(upload, "dist", "index.html"), "<!doctype html>");
   await writeFile(join(upload, "dist-server", "server.mjs"), "// bundled server");
   await writeFile(join(upload, "tests", "fixtures", "plan-request.demo.json"), JSON.stringify({ setup: {} }));
+  await mkdir(join(upload, 'scripts'));
+  await cp('scripts/backup-groups.mjs', join(upload, 'scripts', 'backup-groups.mjs'));
   await writeFile(join(root, ".env"), "server-only-secret");
   let active: Record<string, any> | undefined = {
     name: "weekend-merge", script: join(root, "dist-server", "server.mjs"), cwd: root,
@@ -30,7 +32,7 @@ async function fixture() {
   const pm2 = (args: string[]) => {
     operations.push(args[0]);
     if (args[0] === "jlist") return JSON.stringify(active ? [{ name: active.name, pm2_env: {
-      ...active.env, pm_exec_path: active.script, pm_cwd: active.cwd, exec_interpreter: process.execPath,
+      ...active.env, pm_exec_path: active.script, pm_cwd: active.cwd, exec_interpreter: process.execPath, node_args: active.node_args, kill_timeout: active.kill_timeout,
     } }] : []);
     if (args[0] === "startOrReload") {
       const config = JSON.parse(requireRead(args[1]));
@@ -48,6 +50,27 @@ async function fixture() {
 import { readFileSync as requireRead } from "node:fs";
 
 describe("server artifact deployment", () => {
+  it('validates that the artifact includes its backup helper before accessing PM2', async () => {
+    const f = await fixture();
+    await rm(join(f.root, '.deploy', 'uploads', f.release, 'scripts', 'backup-groups.mjs'));
+    await expect(deployRelease({ ...f })).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(f.operations).toEqual([]);
+    expect(f.active().script).toBe(join(f.root, 'dist-server', 'server.mjs'));
+  });
+  it('leaves the healthy old service untouched when an existing database cannot be backed up', async () => {
+    const f = await fixture();
+    await mkdir(join(f.root, 'data-runtime'));
+    await writeFile(join(f.root, 'data-runtime', 'groups.sqlite'), 'invalid SQLite backup input');
+    await expect(deployRelease({ ...f, fetch: async () => new Response('ok'), pause: async () => {} })).rejects.toThrow();
+    expect(f.active().script).toBe(join(f.root, 'dist-server', 'server.mjs'));
+    expect(f.operations).toEqual(['jlist']);
+    await expect(readFile(join(f.root, '.deploy', 'current.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+  it('refuses to stop an existing group server without its configured drain grace', async () => {
+    const f = await fixture(); f.active().env.GROUP_DB_PATH = join(f.root, 'data-runtime', 'groups.sqlite');
+    await expect(deployRelease({ ...f, fetch: async () => new Response('ok') })).rejects.toThrow(/kill_timeout/);
+    expect(f.operations).toEqual(['jlist']);
+  });
   it("switches to the verified artifact and preserves the existing model environment and source", async () => {
     const f = await fixture();
     const paths: string[] = [];
@@ -68,6 +91,8 @@ describe("server artifact deployment", () => {
     expect(f.active().cwd).toBe(join(f.root, ".deploy", "releases", f.release));
     expect(f.active().env).toMatchObject({ DEEPSEEK_API_KEY: "private-test-key", DEEPSEEK_MODEL: "deepseek-flash", APP_RELEASE: f.release });
     expect(f.active().env).toMatchObject({ QWEATHER_API_KEY: "private-weather-key", QWEATHER_API_HOST: "example.qweatherapi.com" });
+    expect(f.active().env).toMatchObject({ GROUP_DB_PATH: join(f.root, 'data-runtime', 'groups.sqlite'), GROUP_JOB_CONCURRENCY: '2', PUBLIC_ORIGIN: 'https://weekendmerge.ailoong.net.cn' });
+    expect(f.active()).toMatchObject({ node_args: ['--experimental-sqlite'], instances: 1, exec_mode: 'fork', kill_timeout: 240000 });
     expect(await readFile(join(f.root, ".env"), "utf8")).toBe("server-only-secret");
     expect(paths).toContain("/.netlify/functions/plan");
     expect(f.operations.at(-1)).toBe("save");
@@ -76,12 +101,16 @@ describe("server artifact deployment", () => {
 
   it("restores the previous script and environment when the new release fails its health check", async () => {
     const f = await fixture();
+    Object.assign(f.active().env, { PUBLIC_ORIGIN: 'https://custom.example', GROUP_JOB_CONCURRENCY: '3', GROUP_DB_PATH: join(f.root, 'data-runtime', 'groups.sqlite') });
+    Object.assign(f.active(), { node_args: ['--experimental-sqlite', '--trace-warnings'], kill_timeout: 240000 });
     const fetcher = async () => new Response("failed", { status: f.active().env.APP_RELEASE ? 503 : 200 });
     await expect(deployRelease({ ...f, fetch: fetcher, pause: async () => {} })).rejects.toThrow(/rolled back/i);
     expect(f.active().script).toBe(join(f.root, "dist-server", "server.mjs"));
     expect(f.active().env.DEEPSEEK_API_KEY).toBe("private-test-key");
     expect(f.active().env.QWEATHER_API_KEY).toBe("private-weather-key");
     expect(f.active().env.APP_RELEASE).toBeFalsy();
+    expect(f.active().env).toMatchObject({ PUBLIC_ORIGIN: 'https://custom.example', GROUP_JOB_CONCURRENCY: '3', GROUP_DB_PATH: join(f.root, 'data-runtime', 'groups.sqlite') });
+    expect(f.active().node_args).toEqual(['--experimental-sqlite', '--trace-warnings']);
     expect(f.operations.filter(x => x === "start")).toHaveLength(2);
     await expect(readFile(join(f.root, ".deploy", "current.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });

@@ -1,12 +1,10 @@
+import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { loadEnv, type Plugin } from "vite";
-
-const planPath = "/.netlify/functions/plan";
-const replanPath = "/.netlify/functions/replan";
-type Handler = (request: Request) => Promise<Response>;
+import type { createGroupRuntime } from "../server/groups/runtime";
 
 function toRequest(request: IncomingMessage, url: URL) {
   const method = request.method ?? "GET";
@@ -41,30 +39,36 @@ export function localFunctions(): Plugin {
     apply: "serve",
     configureServer(server) {
       const { mode, envDir } = server.config;
-      const env = loadEnv(mode, envDir, ["DEEPSEEK_", "QWEATHER_"]);
-      let planHandler: Promise<Handler> | undefined;
-      const getPlanHandler = () => planHandler ??= server.ssrLoadModule("/netlify/functions/plan.ts")
-        .then((module) => (module.createPlanHandler as (options: { env: Record<string, string> }) => Handler)({ env }));
+      const env = { ...process.env, ...loadEnv(mode, envDir, ["DEEPSEEK_", "QWEATHER_", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) };
+      let runtime: Promise<ReturnType<typeof createGroupRuntime>> | undefined;
+      let selectedOrigin: string | undefined;
+      let closed = false;
+      server.httpServer?.once("close", () => { closed = true; void runtime?.then(app => app.close()); });
       server.middlewares.use((incoming, outgoing, next) => {
-        const url = new URL(incoming.url ?? "/", "http://localhost");
-        if (url.pathname !== planPath && url.pathname !== replanPath) {
+        const path = (incoming.url ?? "/").split("?")[0];
+        if (!path.startsWith("/api") && !path.startsWith("/.netlify/functions/")) {
           next();
           return;
         }
         const execute = async () => {
-          const request = toRequest(incoming, url);
-          if (url.pathname === planPath) {
-            return (await getPlanHandler())(request);
+          if (closed) throw new Error("SERVER_CLOSED");
+          // The runtime accepts HTTP only for explicit loopback development.
+          const publicOrigin = env.PUBLIC_ORIGIN || `http://${incoming.headers.host ?? "localhost:5173"}`;
+          if (!runtime) {
+            runtime = server.ssrLoadModule("/server/groups/runtime.ts").then(module =>
+              (module.createGroupRuntime as typeof createGroupRuntime)({ env, publicOrigin, development: true }));
+            selectedOrigin = new URL(publicOrigin).origin;
           }
-          const { default: replan } = await server.ssrLoadModule("/netlify/functions/replan.ts") as { default: Handler };
-          return replan(request);
+          const request = toRequest(incoming, new URL(incoming.url ?? "/", selectedOrigin));
+          const ip = createHash("sha256").update(String(incoming.socket.remoteAddress ?? "unknown")).digest("hex");
+          return (await runtime).handle(request, ip);
         };
         void execute()
-          .then((response) => sendResponse(response, outgoing))
+          .then((response) => response ? sendResponse(response, outgoing) : next())
           .catch(() => {
             if (outgoing.destroyed || outgoing.headersSent) return;
             outgoing.writeHead(500, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
-            outgoing.end(JSON.stringify({ error: { code: "PLANNING_FAILED", message: "Local function could not complete the request.", retryable: true } }));
+            outgoing.end(JSON.stringify({ error: { code: "SERVICE_UNAVAILABLE", message: "本地服务无法完成请求，请检查Node SQLite与来源配置。", retryable: true } }));
           });
       });
     },

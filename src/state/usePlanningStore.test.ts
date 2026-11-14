@@ -38,6 +38,14 @@ describe("usePlanningStore", () => {
     usePlanningStore.getState().reset();
   });
 
+  it("starts a new setup without carrying either previous private answer", () => {
+    const store = usePlanningStore.getState();
+    store.savePreferences("a", personA);
+    store.savePreferences("b", personB);
+    store.saveSetup({ ...setup, budget: 600 });
+    expect(usePlanningStore.getState().preferences).toEqual({});
+  });
+
   it("advances through private handoff while preserving both preferences", () => {
     expect(usePlanningStore.getState().stage).toBe("setup");
 

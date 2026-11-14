@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ItinerarySchema, ReplanRequestSchema, type AgentEvent, type Itinerary, type ReplanRequest } from "../../src/contracts/agent";
+import { getParticipants, ItinerarySchema, ReplanRequestSchema, type AgentEvent, type Itinerary, type ReplanRequest } from "../../src/contracts/agent";
 import { analyzeConsensus } from "./agent/fallbacks/consensus";
 import { acceptsFeedback, feedbackDescriptions, parseReplanFeedback, type ReplanFeedback } from "./agent/replanFeedback";
 import { validateRequestDate } from "./agent/requestProtection";
@@ -8,7 +8,7 @@ import { jsonError, ndjson, parseJsonRequest } from "./agent/http";
 import { calculateBudget } from "./agent/tools/budget";
 import type { CalculateBudgetInput, EstimateRouteOutput, Place } from "./agent/tools/contracts";
 import { searchPlaces, shanghaiPlaces } from "./agent/tools/places";
-import { expandedAvoidTags, interestMatchesTags, violatesAvoidedStop } from "./agent/tools/preferences";
+import { expandedAvoidTags, interestCoverage, interestCoverageReason, interestMatchesTags, violatesAvoidedStop } from "./agent/tools/preferences";
 import { estimateRoute } from "./agent/tools/route";
 import { validatePlan } from "./agent/tools/validator";
 
@@ -29,7 +29,7 @@ function openAt(place: Place, date: string, start: number, end: number): boolean
 // Only the rejected stop and unlocked immediate neighbors may move in time.
 // Every other stop is an immutable scheduling anchor, including a locked neighbor.
 function schedule(request: ReplanRequest, stops: Itinerary["stops"], places: Place[], affected: Set<number>, route: EstimateRouteOutput): Itinerary["stops"] | undefined {
-  const avoided = [...request.preferences.a.avoid, ...request.preferences.b.avoid];
+  const avoided = [...new Set(getParticipants(request.preferences).flatMap((person) => person.preferences.avoid))];
   const durations = stops.map((stop) => minutes(stop.endTime) - minutes(stop.startTime));
   if (durations.some((duration) => duration <= 0)) return undefined;
   const result = [...stops];
@@ -71,18 +71,27 @@ function replan(request: ReplanRequest, rejectedIndex: number, lockedIds: Set<st
   if (originals.some((place) => !place)) return undefined;
   const existingIds = new Set(request.plan.stops.map((stop) => stop.placeId));
   const existingStopIds = new Set(request.plan.stops.map((stop) => stop.id));
-  const avoided = [...request.preferences.a.avoid, ...request.preferences.b.avoid];
-  const interests = [...new Set([...request.preferences.a.interests, ...request.preferences.b.interests, ...feedback.desired])]
-    .filter((interest) => !feedback.negative.includes(interest));
-  const shared = analyzeConsensus({ ...request, mode: "live" }).shared.filter((interest) => !feedback.negative.includes(interest as typeof interests[number]));
+  const participants = getParticipants(request.preferences);
+  const participantCount = participants.length;
+  const avoided = [...new Set(participants.flatMap((person) => person.preferences.avoid))];
+  const interestSupport = new Map<string, number>();
+  for (const person of participants) {
+    for (const interest of new Set(person.preferences.interests)) interestSupport.set(interest, (interestSupport.get(interest) ?? 0) + 1);
+  }
+  for (const interest of feedback.desired) if (!interestSupport.has(interest)) interestSupport.set(interest, 1);
+  const interests = [...interestSupport.keys()]
+    .filter((interest) => !feedback.negative.some((negative) => negative === interest));
+  const shared = analyzeConsensus(request).shared.filter((interest) => !feedback.negative.some((negative) => negative === interest));
   const neighbors = [originals[rejectedIndex - 1], originals[rejectedIndex + 1]].filter((place): place is Place => !!place);
   const score = (place: Place) => {
-    const hits = interests.filter((interest) => interestMatchesTags(interest, place.tags)).length;
+    const hits = interests.filter((interest) => interestMatchesTags(interest, place.tags))
+      .reduce((sum, interest) => sum + (interestSupport.get(interest) ?? 0), 0);
+    const rank = interestCoverage(participants, [place]).rank;
     const sharedHits = shared.filter((interest) => interestMatchesTags(interest, place.tags)).length;
     const distance = neighbors.reduce((sum, neighbor) => sum + routeFor([place, neighbor]).totalDistanceKm, 0);
-    const suitability = [request.preferences.a, request.preferences.b].reduce((sum, person) => sum +
+    const suitability = participants.map((participant) => participant.preferences).reduce((sum, person) => sum +
       (person.indoorPreference === "室内优先" ? (place.indoor ? 1 : -1) : person.indoorPreference === "户外优先" ? (place.indoor ? -1 : 1) : 0), 0);
-    return sharedHits * 8 + hits * 4 - distance * 2 + suitability * 3 - place.priceRange.max * 0.02;
+    return sharedHits * 8 + hits * 4 + rank * 0.1 - distance * 2 + suitability * 3 - place.priceRange.max * 0.02;
   };
   const alternatives = searchPlaces({ excludedTags: expandedAvoidTags(avoided), limit: 50 }).places
     .filter((place) => !existingIds.has(place.placeId) && acceptsFeedback(place, originals[rejectedIndex]!, feedback))
@@ -104,21 +113,21 @@ function replan(request: ReplanRequest, rejectedIndex: number, lockedIds: Set<st
     for (let suffix = 1; existingStopIds.has(replacementId); suffix += 1) replacementId = `${replacementBase}-${suffix}`;
     const stops = request.plan.stops.map((stop, index) => index === rejectedIndex ? {
       ...stop, id: replacementId, placeId: alternative.placeId,
-      name: alternative.name, area: alternative.area, cost: alternative.priceRange.max * 2,
+      name: alternative.name, area: alternative.area, cost: alternative.priceRange.max * participantCount,
       latitude: alternative.latitude, longitude: alternative.longitude, tags: alternative.tags, locked: false,
     } : stop);
     const route = routeFor(venues);
     const scheduled = schedule(request, stops, venues, affected, route);
     if (!scheduled) continue;
-    const items: CalculateBudgetInput["items"] = venues.map((place) => ({ category: place.category, label: place.name, unitPrice: place.priceRange.max, quantity: 2 }));
-    for (const leg of route.legs) if (leg.mode === "transit") items.push({ category: "transport", label: "交通预算", unitPrice: 4, quantity: 2 });
+    const items: CalculateBudgetInput["items"] = venues.map((place) => ({ category: place.category, label: place.name, unitPrice: place.priceRange.max, quantity: participantCount }));
+    for (const leg of route.legs) if (leg.mode === "transit") items.push({ category: "transport", label: "交通预算", unitPrice: 4, quantity: participantCount });
     const budget = calculateBudget({ items, budgetLimit: request.setup.budget, bufferRate: 0.1 });
     const sharedHits = venues.reduce((sum, place) => sum + shared.filter((interest) => interestMatchesTags(interest, place.tags)).length, 0);
     const interestHits = venues.reduce((sum, place) => sum + interests.filter((interest) => interestMatchesTags(interest, place.tags)).length, 0);
     const plan = ItinerarySchema.parse({ ...request.plan,
       id: `${request.plan.id}-replan-${request.replanCount + 1}`, stops: scheduled,
       title: `${alternative.name}与周末行程`,
-      reasons: [feedbackDescriptions[feedback.code], `行程包含${scheduled.map((stop) => stop.name).join("、")}`, "已重新核对时间、路线与预算"],
+      reasons: [feedbackDescriptions[feedback.code], interestCoverageReason(participants, venues), `行程包含${scheduled.map((stop) => stop.name).join("、")}`, "已重新核对时间、路线与预算"],
       summary: scheduled.map((stop) => stop.name).join("、"),
       matchScore: Math.max(0, Math.min(100, 60 + sharedHits * 12 + interestHits * 5)),
       totalCost: budget.total, totalDistanceKm: route.totalDistanceKm,
@@ -170,7 +179,7 @@ export function createReplanHandler(dependencies: { now?: () => Date } = {}) {
         ["validate_plan", validationEvidence([{ candidateId: plan.id, validation }])],
       ] as const) events.push({ type: "tool.completed", tool, summary, durationMs: Math.max(0, now().getTime() - started), source: "local" });
       events.push({ type: "step.started", step: "VERIFY", at }, { type: "plan.proposed", plan }, { type: "run.completed", result: {
-        runId, consensus: analyzeConsensus({ ...body, mode: "live" }), candidateIds: [plan.id],
+        runId, consensus: analyzeConsensus(body), candidateIds: [plan.id],
         diff: { replacedStopIds: [body.rejectedStopId], preservedStopIds: stopIds.filter((id) => id !== body.rejectedStopId), summary: "已替换否决地点，仅在需要时调整相邻未锁定地点的时间，并重新核对路线和预算。" },
       } });
       return ndjson(events);

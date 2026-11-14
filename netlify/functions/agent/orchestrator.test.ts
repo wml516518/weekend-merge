@@ -111,7 +111,7 @@ describe("controlled planning orchestrator", () => {
     }]).model });
     expect(candidates(events)).toHaveLength(3);
     expect(candidates(events)[0]).toMatchObject({ title: "方案 1", summary: "场馆0、场馆1", matchScore: 100,
-      reasons: ["已核对地点、时间、路线和预算"],
+      reasons: ["行程覆盖 2/2 位成员的兴趣", "已核对地点、时间、路线和预算"],
     });
     expect(candidates(events)[0].stops.map((stop) => stop.id)).toEqual([
       `${candidates(events)[0].id}-stop-1`, `${candidates(events)[0].id}-stop-2`,
@@ -273,7 +273,7 @@ describe("controlled planning orchestrator", () => {
     const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
     expect(script.inputs).toHaveLength(3);
     expect(script.inputs[2].validationFeedback).toBeDefined();
-    expect(events.some((event) => event.type === "run.degraded")).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({ type: "run.degraded", fallback: "rule-planner" }));
     expect(candidates(events).every((plan) => plan.id.includes("-rule-"))).toBe(true);
     expect(new Set(candidates(events)[0].stops.map(stop => stop.placeId))).toEqual(new Set(["venue-0", "venue-1"]));
   });

@@ -1,4 +1,4 @@
-import { PlanDateSchema, type Itinerary, type PersonPreferences, type PlanSetup } from "../../../../src/contracts/agent";
+import { getParticipants, PlanDateSchema, type Itinerary, type PlanningPreferences, type PlanSetup } from "../../../../src/contracts/agent";
 
 import type { Place } from "./contracts";
 import { effectiveWalkingLimitKm, violatesAvoidedStop } from "./preferences";
@@ -21,7 +21,7 @@ export type ValidationResult = {
 export type ValidatePlanInput = {
   plan: Itinerary;
   setup: PlanSetup;
-  preferences: { a: PersonPreferences; b: PersonPreferences };
+  preferences: PlanningPreferences;
   places: readonly Place[];
   walkingDistanceKm?: number;
   lockedStopIds: readonly string[];
@@ -67,7 +67,8 @@ export function validatePlan(input: ValidatePlanInput): ValidationResult {
   }
   const placeById = new Map(places.map((place) => [place.placeId, place]));
   const usedPlaces = new Set<string>();
-  const avoided = [...preferences.a.avoid, ...preferences.b.avoid];
+  const participants = getParticipants(preferences);
+  const avoided = [...new Set(participants.flatMap((person) => person.preferences.avoid))];
   const planDateMs = Date.parse(`${setup.date}T00:00:00Z`);
   const rangeStart = minutes(setup.startTime);
   const rangeEnd = minutes(setup.endTime, true);

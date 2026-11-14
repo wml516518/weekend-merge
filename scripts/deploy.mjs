@@ -10,7 +10,7 @@ const delay = ms => new Promise(done => setTimeout(done, ms));
 function runPm2(args) {
   try {
     return execFileSync("pm2", args, {
-      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 45_000, killSignal: "SIGKILL",
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 270_000, killSignal: "SIGKILL",
     });
   } catch {
     // PM2's output/configuration may contain environment secrets.
@@ -18,13 +18,16 @@ function runPm2(args) {
   }
 }
 
-function snapshot(pm2) {
+function snapshot(pm2, root) {
   const matches = JSON.parse(pm2(["jlist"])).filter(p => p.name === appName);
   if (matches.length !== 1) throw new Error("Expected exactly one existing weekend-merge PM2 process");
   const previous = matches[0].pm2_env;
   if (!isAbsolute(previous.pm_exec_path) || !isAbsolute(previous.pm_cwd)) throw new Error("Invalid PM2 application paths");
+  if ((previous.GROUP_DB_PATH || previous.env?.GROUP_DB_PATH) && Number(previous.kill_timeout ?? 1600) < 240_000) {
+    throw new Error('Existing group server needs PM2 kill_timeout >= 240000 before deployment');
+  }
   const env = {};
-  for (const key of ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV"]) {
+  for (const key of ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) {
     env[key] = previous[key] ?? previous.env?.[key] ?? "";
   }
   env.HOST ||= "127.0.0.1";
@@ -32,6 +35,10 @@ function snapshot(pm2) {
   env.STATIC_ROOT ||= join(previous.pm_cwd, "dist");
   env.TRUSTED_PROXY_DEPTH ||= "1";
   env.NODE_ENV ||= "production";
+  env.GROUP_DB_PATH ||= join(root, 'data-runtime', 'groups.sqlite');
+  env.GROUP_JOB_CONCURRENCY ||= '2';
+  env.PUBLIC_ORIGIN ||= 'https://weekendmerge.ailoong.net.cn';
+  if (env.GROUP_DB_PATH !== join(root, 'data-runtime', 'groups.sqlite')) throw new Error('GROUP_DB_PATH must use the stable deployment data-runtime directory');
   // Do not alter unrelated processes, expose a public port, or inherit PM2 internals.
   if (!["127.0.0.1", "localhost"].includes(env.HOST) || String(env.PORT) !== "8787") {
     throw new Error("Deployment expects the existing service on 127.0.0.1:8787");
@@ -40,6 +47,7 @@ function snapshot(pm2) {
     name: appName, script: previous.pm_exec_path, cwd: previous.pm_cwd,
     interpreter: previous.exec_interpreter || process.execPath,
     instances: 1, exec_mode: "fork", env,
+    node_args: previous.node_args || [], kill_timeout: 240_000,
   };
 }
 
@@ -104,16 +112,22 @@ export async function deployRelease({ root, release, pm2 = runPm2, fetch: fetche
   };
   try {
     const upload = join(deployment, "uploads", release);
-    for (const path of ["dist/index.html", "dist-server/server.mjs", "tests/fixtures/plan-request.demo.json"]) {
+    for (const path of ["dist/index.html", "dist-server/server.mjs", "tests/fixtures/plan-request.demo.json", "scripts/backup-groups.mjs"]) {
       await access(join(upload, path));
     }
-    const previous = snapshot(pm2);
+    const previous = snapshot(pm2, root);
+    // Prepare the snapshot before promotion: a CLI loaded from uploads keeps its
+    // original import.meta.url even after that directory is renamed. Preparation
+    // failures must leave the healthy old process running without a restart.
+    const exists = await access(previous.env.GROUP_DB_PATH).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+    if (exists) execFileSync(process.execPath, ['--experimental-sqlite', join(upload, 'scripts', 'backup-groups.mjs'), previous.env.GROUP_DB_PATH], { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 });
     const directory = join(deployment, "releases", release);
     await mkdir(join(deployment, "releases"), { recursive: true });
     await rename(upload, directory);
     const next = {
       ...previous, script: join(directory, "dist-server", "server.mjs"), cwd: directory,
       interpreter: process.execPath,
+      node_args: ['--experimental-sqlite'],
       env: { ...previous.env, APP_RELEASE: release, STATIC_ROOT: join(directory, "dist") },
     };
     try {

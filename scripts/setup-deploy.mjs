@@ -34,6 +34,10 @@ async function main() {
   const deployment = join(root, ".deploy");
   await mkdir(join(deployment, "uploads"), { recursive: true, mode: 0o700 });
   await chmod(deployment, 0o700);
+  // Runtime data is deliberately a sibling of .deploy, never a release child.
+  await mkdir(join(root, 'data-runtime', 'backups'), { recursive: true, mode: 0o700 });
+  await chmod(join(root, 'data-runtime'), 0o700);
+  await chmod(join(root, 'data-runtime', 'backups'), 0o700);
   const runner = join(deployment, "run-node");
   await writeFile(runner, [
     "#!/usr/bin/env bash", "set -euo pipefail",

@@ -20,19 +20,21 @@ export function FinalItinerary({
   onBack,
   readOnly = false,
   live = false,
+  participantCount = 2,
 }: {
   plan: Itinerary;
   setup?: PlanSetup;
   onBack?: () => void;
   readOnly?: boolean;
   live?: boolean;
+  participantCount?: number;
 }) {
   const [message, setMessage] = useState("");
   const [exporting, setExporting] = useState(false);
   async function download() {
     setExporting(true);
     try {
-      await exportItinerary(plan, setup, live);
+      await exportItinerary(plan, setup, live, participantCount);
       setMessage("行程长图已生成。");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "导出失败，请重试。");
@@ -42,11 +44,11 @@ export function FinalItinerary({
   }
   async function share() {
     try {
-      const hash = encodeShare(plan, setup);
+      const hash = encodeShare(plan, setup, participantCount);
       await navigator.clipboard.writeText(
         `${location.origin}${location.pathname}${hash}`,
       );
-      setMessage("只读分享链接已复制，不包含双方个人偏好。");
+      setMessage("只读分享链接已复制，不包含个人偏好。");
     } catch (e) {
       setMessage(
         e instanceof Error ? e.message : "剪贴板不可用，请使用导出长图。",
@@ -59,13 +61,13 @@ export function FinalItinerary({
       <div className="center-heading">
         <Tag>
           {readOnly ? <LockKeyhole size={15} /> : <CheckCheck size={15} />}{" "}
-          {readOnly ? "只读分享快照" : "两个人，都说好"}
+          {readOnly ? "只读分享快照" : `${participantCount} 人，都说好`}
         </Tag>
         <h1>{plan.title}。</h1>
         <p>
           {setup
             ? `${dateLabel(setup.date)} · 上海 · ${setup.startTime}–${setup.endTime}`
-            : "上海 · 两个人的周末"}
+            : `上海 · ${participantCount} 个人的周末`}
         </p>
       </div>
       <div className="final-layout">
@@ -89,7 +91,9 @@ export function FinalItinerary({
                   {stop.area} · {stop.tags.join(" / ")}
                 </p>
                 <Tag>{stop.tags[0] ?? "周末活动"}</Tag>
-                <span className="final-price">两人 ¥{stop.cost}</span>
+                <span className="final-price">
+                  {participantCount} 人 ¥{stop.cost}
+                </span>
                 {i < plan.stops.length - 1 && (
                   <div className="transit-note">
                     <Footprints size={13} />
@@ -114,8 +118,14 @@ export function FinalItinerary({
               </div>
             )}
             <div className="summary-total">
-              <span>两人总计</span>
+              <span>{participantCount} 人总计</span>
               <b>¥{plan.totalCost}</b>
+            </div>
+            <div>
+              <span>人均估算</span>
+              <b>
+                ¥{Math.round((plan.totalCost / participantCount) * 100) / 100}
+              </b>
             </div>
             <p>
               {setup
@@ -173,7 +183,9 @@ export function FinalItinerary({
         <RouteMap plan={plan} />
       </div>
       <p className="final-disclaimer">
-        {live || readOnly ? "路线与费用为估算。出发前请核对营业时间、票价和天气。" : "演示行程。地点、价格与天气为预设数据。"}
+        {live || readOnly
+          ? "路线与费用为估算。出发前请核对营业时间、票价和天气。"
+          : "演示行程。地点、价格与天气为预设数据。"}
       </p>
     </main>
   );

@@ -21,4 +21,18 @@ describe("read-only share snapshot", () => {
     );
     expect(decodeShare("")).toBe(null);
   });
+  it("retains actual headcount for a group and defaults legacy snapshots to two", () => {
+    expect(decodeShare(encodeShare(plan, undefined, 6))?.participantCount).toBe(
+      6,
+    );
+    const old =
+      "#share=" +
+      btoa(
+        Array.from(
+          new TextEncoder().encode(JSON.stringify({ version: 1, plan })),
+          (b) => String.fromCharCode(b),
+        ).join(""),
+      );
+    expect(decodeShare(old)?.participantCount).toBe(2);
+  });
 });

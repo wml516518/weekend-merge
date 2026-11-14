@@ -85,7 +85,14 @@ export const usePlanningStore = create<PlanningStore>()(
     (set, get) => ({
       ...initialState,
       saveSetup: (setup) =>
-        set({ setup, stage: "person-a", sessionId: undefined, liveEvents: [], ...emptyNegotiation }),
+        set({
+          setup,
+          preferences: {},
+          stage: "person-a",
+          sessionId: undefined,
+          liveEvents: [],
+          ...emptyNegotiation,
+        }),
       savePreferences: (person, preferences) =>
         set((state) => ({
           preferences: { ...state.preferences, [person]: preferences },
@@ -94,7 +101,13 @@ export const usePlanningStore = create<PlanningStore>()(
       handoffToB: () => set({ stage: "person-b" }),
       revealConsensus: () => set({ stage: "consensus" }),
       openWorkbench: (mode, sessionId) =>
-        set({ stage: "workbench", mode, sessionId, liveEvents: [], ...emptyNegotiation }),
+        set({
+          stage: "workbench",
+          mode,
+          sessionId,
+          liveEvents: [],
+          ...emptyNegotiation,
+        }),
       goTo: (stage) => set({ stage }),
       selectPlan: (id) => set({ activePlanId: id, activeStopId: undefined }),
       selectStop: (id) => set({ activeStopId: id }),
