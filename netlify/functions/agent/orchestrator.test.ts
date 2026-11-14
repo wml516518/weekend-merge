@@ -130,11 +130,11 @@ describe("controlled planning orchestrator", () => {
     expect(events.at(-1)?.type).toBe("run.completed");
   });
 
-  it("executes no more than six model-requested tools and fails the seventh", async () => {
+  it("executes no more than eight model-requested tools and fails the ninth", async () => {
     const deps = dependencies();
-    const script = scripted([{ type: "tool_calls", calls: Array.from({ length: 7 }, (_, i) => ({ ...weatherCall, id: `weather-${i}` })) }, final]);
+    const script = scripted([{ type: "tool_calls", calls: Array.from({ length: 9 }, (_, i) => ({ ...weatherCall, id: `weather-${i}` })) }, final]);
     const events = await runPlanningAgent(request, { ...deps, model: script.model });
-    expect(deps.tools.get_weather).toHaveBeenCalledTimes(6);
+    expect(deps.tools.get_weather).toHaveBeenCalledTimes(8);
     expect(events).toContainEqual({ type: "tool.failed", tool: "get_weather", code: "TOOL_LIMIT_EXCEEDED", retryable: false });
     expect(script.inputs).toHaveLength(1);
     expect(events.some((event) => event.type === "run.degraded")).toBe(true);
@@ -246,15 +246,52 @@ describe("controlled planning orchestrator", () => {
   it.each([
     { type: "final", consensus: {}, plans: [] },
     { type: "final", consensus: final.consensus, plans: plans.slice(0, 2) },
-    { type: "final", consensus: final.consensus, plans: [plans[0], plans[0], plans[0]] },
     weatherCall,
-  ])("degrades an invalid second response immediately with no third request", async (invalid) => {
-    const script = scripted([weatherCall, invalid, final]);
+  ])("degrades when one repair also returns a schema-invalid final", async (invalid) => {
+    const script = scripted([weatherCall, invalid, invalid]);
     const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
-    expect(script.inputs).toHaveLength(2);
+    expect(script.inputs).toHaveLength(3);
+    expect(script.inputs[2].validationFeedback).toBeDefined();
     expect(events.some((event) => event.type === "run.degraded")).toBe(true);
     expect(candidates(events)).toHaveLength(3);
     expect(candidates(events).every((plan) => plan.id.includes("-rule-"))).toBe(true);
+  });
+
+  it("requests one repair when the second response is not a final planning object", async () => {
+    const script = scripted([weatherCall, { type: "json_object" }, final]);
+    const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
+    expect(script.inputs).toHaveLength(3);
+    expect(script.inputs[2].validationFeedback).toBeDefined();
+    expect(events.some((event) => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events)).toHaveLength(3);
+    expect(candidates(events).every((plan) => plan.id.startsWith("plan-"))).toBe(true);
+  });
+
+  it("uses model-selected venues through the constrained planner after one unsuccessful repair", async () => {
+    const duplicateFinal = { ...final, plans: [plans[0], plans[0], plans[2]] };
+    const script = scripted([weatherCall, duplicateFinal, { type: "final", consensus: final.consensus, plans: [] }]);
+    const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
+    expect(script.inputs).toHaveLength(3);
+    expect(script.inputs[2].validationFeedback).toBeDefined();
+    expect(events.some((event) => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events).every((plan) => plan.id.includes("-rule-"))).toBe(true);
+    expect(new Set(candidates(events)[0].stops.map(stop => stop.placeId))).toEqual(new Set(["venue-0", "venue-1"]));
+  });
+
+  it("asks the model for one repair after a schema-valid final fails semantic verification", async () => {
+    const duplicateFinal = { ...final, plans: [plans[0], plans[0], plans[2]] };
+    const script = scripted([weatherCall, duplicateFinal, final]);
+    const events = await runPlanningAgent(request, { ...dependencies(), model: script.model });
+
+    expect(script.inputs).toHaveLength(3);
+    expect(script.inputs[2].toolResults).toEqual(script.inputs[1].toolResults);
+    expect(script.inputs[2].validationFeedback).toEqual(expect.arrayContaining([
+      expect.stringContaining("different unordered placeId sets"),
+      expect.stringContaining("300"),
+    ]));
+    expect(events.some((event) => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events)).toHaveLength(3);
+    expect(candidates(events).every((plan) => plan.id.startsWith("plan-"))).toBe(true);
   });
 
   it("uses request-scoped Shanghai weather for model results and fallback", async () => {

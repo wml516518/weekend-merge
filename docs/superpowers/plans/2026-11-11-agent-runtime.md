@@ -411,7 +411,7 @@ The Gemini adapter declares only registered tool schemas, requests JSON-compatib
 
 - [ ] **Step 5: Implement the state machine**
 
-Emit `VALIDATE`, `ANALYZE`, `GATHER`, `PROPOSE`, and `VERIFY` step events in order. Enforce two model turns and six tool executions. Always run route, budget, and validation in application code even when the model did not request them. A valid second-turn model result emits three candidates; an invalid final emits `run.degraded` immediately and calls `createRulePlans` so the two-request ceiling remains hard.
+Emit `VALIDATE`, `ANALYZE`, `GATHER`, `PROPOSE`, and `VERIFY` step events in order. Enforce three model turns (initial tool selection, final proposal, optional validation repair) and eight tool executions. Always run route, budget, and validation in application code even when the model did not request them. A valid second-turn model result emits three candidates; a schema-valid but semantically invalid final can request one repair, after which the constrained planner may use model-selected venues. Unrepairable model or tool failures emit `run.degraded` and call `createRulePlans`.
 
 - [ ] **Step 6: Run orchestrator tests and the full suite**
 
