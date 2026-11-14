@@ -119,8 +119,14 @@ type ModelHistory = { assistant: AssistantMessage; finalContent?: string };
 
 function normalizeStopTimes(value: unknown, outingDate: string): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const plans = (value as { plans?: unknown }).plans;
+  const payload = value as Record<string, unknown>;
+  const plans = payload.plans;
   if (!Array.isArray(plans)) return value;
+  // DeepSeek JSON mode can echo the response_format discriminator instead of
+  // the schema's "final" discriminator. The payload is otherwise the final
+  // object; normalize only this provider wrapper and leave unknown types for
+  // the strict model-schema/error path.
+  if (payload.type === "json_object") payload.type = "final";
   for (const plan of plans) {
     if (!plan || typeof plan !== "object" || Array.isArray(plan)) continue;
     const stops = (plan as { stops?: unknown }).stops;
