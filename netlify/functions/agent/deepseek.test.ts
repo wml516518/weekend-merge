@@ -78,6 +78,15 @@ describe("DeepSeek server adapter", () => {
     });
   });
 
+  it("normalizes DeepSeek JSON mode's json_object discriminator", async () => {
+    const model = createDeepSeekModel({ apiKey: "test-only", fetch: async () => apiResponse({
+      content: '{"type":"json_object","consensus":{"shared":[],"conflicts":[],"constraints":[]},"plans":[]}',
+    }) });
+    expect(await model.next({ request, toolResults: [] })).toEqual({
+      type: "final", consensus: { shared: [], conflicts: [], constraints: [] }, plans: [],
+    });
+  });
+
   it("normalizes model-provided ISO stop times to the HH:MM itinerary contract", async () => {
     const model = createDeepSeekModel({ apiKey: "test-only", fetch: async () => apiResponse({
       content: JSON.stringify({
