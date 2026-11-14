@@ -22,7 +22,7 @@ const CallsSchema = z.union([
 ]);
 
 class PlanningError extends Error {
-  constructor(readonly code: string) { super(code); }
+  constructor(readonly code: string, readonly feedback: string[] = []) { super(code); }
 }
 
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
@@ -38,6 +38,7 @@ function repairFeedback(plans: Itinerary[] | undefined, request: PlanRequest): s
     ...(duplicates.length ? [`Duplicate placeId sets to replace: ${[...new Set(duplicates)].join(" | ")}`] : []),
     "Use only placeId values returned by search_places and exclude venues whose tags match the original avoid lists.",
     `The combined budget limit is ${request.setup.budget}. For each plan, sum each venue's maximum per-person price times ${participantCount}, add ${participantCount * 4} for each transit leg, apply a 10% buffer, and replace venues if the result is over budget.`,
+    "Server rejection details below use mandatory catalog maximum prices. Do not invent discounts or free sections. Change the actual placeId combination for an over-budget plan; changing only totalCost or reasons cannot fix it.",
     "Ensure every stop is open, inside the outing range, has realistic travel time between stops, and stays within the stricter walking cap.",
   ];
 }
@@ -187,6 +188,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
       throw new PlanningError("INVALID_MODEL_RESULT");
     }
     const verified: Itinerary[] = [];
+    const failures: string[] = [];
     for (const [candidateIndex, proposal] of proposals.entries()) {
       const venues = proposal.stops.map((stop) => {
         const place = placeById.get(stop.placeId);
@@ -231,10 +233,22 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
       } : validation });
       // validatePlan checks opening and hard constraints; also reserve actual leg travel time.
       if (!validation.valid || insufficientTravelTime) {
-        throw new PlanningError("INVALID_MODEL_RESULT");
+        failures.push(JSON.stringify({
+          candidate: candidateIndex + 1, budgetLimit: request.setup.budget, totalCost: budget.total,
+          venues: venues.map(place => ({ placeId: place.placeId, maxPricePerPerson: place.priceRange.max, quantity: participantCount })),
+          violations: validations.at(-1)!.validation.violations.map(violation => ({ code: violation.code,
+            placeIds: stops.filter(stop => violation.affectedStopIds.includes(stop.id)).map(stop => stop.placeId),
+          })),
+          travelLegs: route.legs.map((leg, index) => ({ fromPlaceId: leg.fromPlaceId, toPlaceId: leg.toPlaceId,
+            mode: leg.mode, requiredMinutes: leg.durationMinutes,
+            availableMinutes: minutes(stops[index + 1].startTime) - minutes(stops[index].endTime),
+          })),
+        }));
+        continue;
       }
       verified.push(plan);
     }
+    if (failures.length) throw new PlanningError("INVALID_MODEL_RESULT", failures);
     return verified;
   }
 
@@ -256,7 +270,7 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
           const repairedTurn = await dependencies.model.next({
             request: requestForModel,
             toolResults: modelToolResults,
-            validationFeedback: repairFeedback(final.plans, request),
+            validationFeedback: [...repairFeedback(final.plans, request), ...(error instanceof PlanningError ? error.feedback : [])],
           });
           const repaired = ModelFinalSchema.safeParse(repairedTurn);
           if (!repaired.success) throw new PlanningError("INVALID_MODEL_RESULT");
