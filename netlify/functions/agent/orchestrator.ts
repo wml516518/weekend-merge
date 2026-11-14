@@ -39,6 +39,7 @@ function repairFeedback(plans: Itinerary[] | undefined, request: PlanRequest): s
     "Use only placeId values returned by search_places and exclude venues whose tags match the original avoid lists.",
     `The combined budget limit is ${request.setup.budget}. For each plan, sum each venue's maximum per-person price times ${participantCount}, add ${participantCount * 4} for each transit leg, apply a 10% buffer, and replace venues if the result is over budget.`,
     "Server rejection details below use mandatory catalog maximum prices. Do not invent discounts or free sections. Change the actual placeId combination for an over-budget plan; changing only totalCost or reasons cannot fix it.",
+    `This group has ${participantCount} participants in total; the ${request.setup.budget} yuan limit applies to all participants together. Plans are distinct venue combinations, not per-person budgets.`,
     "Ensure every stop is open, inside the outing range, has realistic travel time between stops, and stays within the stricter walking cap.",
   ];
 }

@@ -320,6 +320,29 @@ describe("controlled planning orchestrator", () => {
     expect(JSON.stringify(details)).not.toMatch(/private wish|untrusted/);
   });
 
+  it("tells a six-person repair that the participant budget is per group, not per plan", async () => {
+    const oversized: PlanRequest = { ...request, setup: { ...request.setup, budget: 340, startingArea: "徐汇滨江" },
+      preferences: { participants: Array.from({ length: 6 }, (_, index) => ({
+        id: `member-${index + 1}`, preferences: structuredClone(index % 2 ? request.preferences.b! : request.preferences.a!),
+      })) } };
+    const overBudget = structuredClone(plans).map(plan => ({
+      ...plan, stops: plan.stops.map(stop => stop.placeId === "venue-0" ? { ...stop, placeId: "venue-3" } : stop),
+    }));
+    const script = scripted([weatherCall, { ...final, plans: overBudget }, final]);
+    const events = await runPlanningAgent(oversized, { now, places, model: script.model,
+      tools: createAgentTools({ request: oversized, places, weather: async () => weather }) });
+
+    expect(script.inputs).toHaveLength(3);
+    expect(script.inputs[2].validationFeedback).toContain("This group has 6 participants in total; the 340 yuan limit applies to all participants together. Plans are distinct venue combinations, not per-person budgets.");
+    expect(script.inputs[2].validationFeedback).toEqual(expect.arrayContaining([
+      expect.stringContaining('"candidate":1'),
+      expect.stringContaining('"totalCost":396'),
+    ]));
+    expect(events.some(event => event.type === "run.degraded")).toBe(false);
+    expect(candidates(events).map(plan => plan.totalCost)).toEqual([198, 264, 330]);
+    expect(candidates(events).every(plan => plan.totalCost <= oversized.setup.budget)).toBe(true);
+  });
+
   it("uses request-scoped Shanghai weather for model results and fallback", async () => {
     const scopes: unknown[] = [];
     const tools = createAgentTools({ request, places, weather: async (scope) => {
