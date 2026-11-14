@@ -13,6 +13,7 @@ export interface GroupView {
   id: string; name: string; targetCount: number; setup: PlanSetup; revision: number; stateVersion: number;
   state: GroupState; createdAt: number; expiresAt: number; inviteExpiresAt: number;
   canManage: boolean; members: GroupMember[]; myMembers: MyGroupMember[]; job?: GroupJobView;
+  candidates: Itinerary[];
   finalPlanId?: string; selectedPlanId?: string; lockedStopIds: string[]; replanCount: number;
 }
 export interface GroupCreated { group: GroupView; memberId: string; inviteToken: string; memberRecoveryToken: string; ownerRecoveryToken: string }

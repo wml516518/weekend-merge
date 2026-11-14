@@ -6,7 +6,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GroupRepository } from './repository';
 import { runPlanningAgent } from '../../netlify/functions/agent/orchestrator';
-import type { PersonPreferences, PlanSetup, Itinerary } from '../../src/contracts/agent';
+import { createReplanHandler } from '../../netlify/functions/replan';
+import { shanghaiPlaces } from '../../netlify/functions/agent/tools/places';
+import { estimateRoute } from '../../netlify/functions/agent/tools/route';
+import { calculateBudget } from '../../netlify/functions/agent/tools/budget';
+import type { PersonPreferences, PlanSetup, Itinerary, PlanDiff, AgentEvent } from '../../src/contracts/agent';
 
 const setup: PlanSetup = { city: '上海', date: '2026-11-14', startTime: '13:00', endTime: '20:00', budget: 300, startingArea: '徐汇' };
 const preferences: PersonPreferences = { interests: ['咖啡'], pace: '平衡', walkingLimitKm: 3, indoorPreference: '均可', foodTags: [], budgetStyle: '平衡', avoid: [], wish: 'private wish' };
@@ -32,14 +36,44 @@ function queued(repo: GroupRepository) {
   submit(repo, 'b', a.group.id, b.memberId);
   return { a, b };
 }
-function plan(id: string): Itinerary {
-  return { id, title: '书城', summary: '看书', matchScore: 80, totalCost: 0, totalDistanceKm: 0, indoorRatio: 100, transfers: 0, reasons: ['阅读'],
-    stops: [{ id: 'stop-1', placeId: 'shanghai-book-city', name: '书城', area: '黄浦', startTime: '14:00', endTime: '16:00', cost: 0, latitude: 31.2312, longitude: 121.4809, tags: ['阅读'], locked: false }] };
+function plan(id: string, venue = 'shanghai-book-city'): Itinerary {
+  const place = shanghaiPlaces.find(p => p.placeId === venue)!;
+  return { id, title: place.name, summary: '看书', matchScore: 80, totalCost: place.priceRange.max * 2 * 1.1, totalDistanceKm: 0, indoorRatio: place.indoor ? 100 : 0, transfers: 0, reasons: ['阅读'],
+    stops: [{ id: 'stop-1', placeId: place.placeId, name: place.name, area: place.area, startTime: '14:00', endTime: '16:00', cost: place.priceRange.max * 2, latitude: place.latitude, longitude: place.longitude, tags: place.tags, locked: false }] };
+}
+function emitResult(repo: GroupRepository, job: NonNullable<ReturnType<GroupRepository['claimJob']>>, plans: Itinerary[], diff?: PlanDiff) {
+  for (const candidate of plans) repo.appendEvent(job.id, job.lease, { type: 'plan.proposed', plan: candidate });
+  repo.appendEvent(job.id, job.lease, { type: 'run.completed', result: { runId: job.id, consensus: { shared: [], conflicts: [], constraints: [] }, candidateIds: plans.map(p => p.id), ...(diff ? { diff } : {}) } });
+}
+function replacement(job: NonNullable<ReturnType<GroupRepository['claimJob']>>, id = 'plan-revised') {
+  const request = job.replanRequest!;
+  const venue = ['jic-books-pujiang', 'shanghai-book-city', 'shanghai-museum-east'].find(v => !request.plan.stops.some(s => s.placeId === v))!;
+  const revised = plan(id, venue);
+  revised.stops = request.plan.stops.map(stop => stop.id === request.rejectedStopId ? { ...revised.stops[0], id: `${stop.id}-replacement`, startTime: stop.startTime, endTime: stop.endTime } : { ...stop });
+  return { revised, diff: { replacedStopIds: [request.rejectedStopId], preservedStopIds: request.plan.stops.filter(s => s.id !== request.rejectedStopId).map(s => s.id), summary: '替换地点' } };
+}
+function recalculate(candidate: Itinerary): Itinerary {
+  const route = candidate.stops.length > 1 ? estimateRoute({ stops: candidate.stops, mode: 'mixed' }) : { legs: [], totalDistanceKm: 0 };
+  const items = candidate.stops.map(s => ({ category: 'venue', label: s.name, unitPrice: s.cost / 2, quantity: 2 }));
+  for (const leg of route.legs) if (leg.mode === 'transit') items.push({ category: 'transport', label: '交通预算', unitPrice: 4, quantity: 2 });
+  return { ...candidate, totalDistanceKm: route.totalDistanceKm, totalCost: calculateBudget({ items, budgetLimit: 300, bufferRate: 0.1 }).total };
+}
+function localReplan(repo: GroupRepository) {
+  const { a } = queued(repo); const initial = repo.claimJob()!;
+  const original = recalculate({ ...plan('base'), stops: ['shanghai-book-city', 'jic-books-pujiang', 'shanghai-museum-east', 'century-park'].map((venue, i) => ({ ...plan('base', venue).stops[0], id: `stop-${i + 1}`, startTime: `${13 + i}:00`, endTime: `${13 + i}:30` })) });
+  emitResult(repo, initial, [original, plan('other-1', 'fuxing-park'), plan('other-2', 'the-bund-promenade')]); repo.finishJob(initial.id, initial.lease, 'succeeded');
+  let view = repo.view('a', a.group.id); view = repo.select('a', a.group.id, { version: view.stateVersion, planId: 'base', lockedStopIds: ['stop-1'] });
+  repo.replan('a', a.group.id, { version: view.stateVersion, rejectedStopId: 'stop-2', reason: '调整', reasonCode: 'CHANGE_PLACE' });
+  const job = repo.claimJob()!;
+  const revised = recalculate({ ...original, id: 'local-revised', stops: original.stops.map(stop => stop.id === 'stop-2' ? { ...plan('replacement', 'fuxing-park').stops[0], id: 'new-stop', startTime: stop.startTime, endTime: stop.endTime } : { ...stop }) });
+  return { job, revised, diff: { replacedStopIds: ['stop-2'], preservedStopIds: ['stop-1', 'stop-3', 'stop-4'], summary: '替换地点' } };
 }
 function complete(repo: GroupRepository, job: NonNullable<ReturnType<GroupRepository['claimJob']>>, ids = ['plan-1', 'plan-2', 'plan-3']) {
-  for (const id of ids) repo.appendEvent(job.id, job.lease, { type: 'plan.proposed', plan: plan(id) });
-  repo.appendEvent(job.id, job.lease, { type: 'run.completed', result: { runId: job.id, consensus: { shared: [], conflicts: [], constraints: [] }, candidateIds: ids,
-    ...(job.kind === 'replan' ? { diff: { replacedStopIds: ['stop-1'], preservedStopIds: [], summary: '调整' } } : {}) } });
+  if (job.kind === 'replan') {
+    const { revised, diff } = replacement(job, ids[0]); emitResult(repo, job, [revised], diff);
+  } else {
+    emitResult(repo, job, ids.map((id, index) => plan(id, ['shanghai-book-city', 'shanghai-museum-east', 'fuxing-park'][index])));
+  }
   repo.finishJob(job.id, job.lease, 'succeeded');
 }
 afterEach(() => { for (const repo of repos.splice(0)) repo.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -248,7 +282,6 @@ describe('owner selection, replan and finalization', () => {
     expect(retry.attempt).toBe(2); expect(retry.replanRequest).toEqual(job.replanRequest);
     complete(resumed, retry, ['plan-revised']);
     const ready = resumed.view('a', a.group.id); expect(ready.replanCount).toBe(1); expect(ready.selectedPlanId).toBe('plan-revised');
-    expect(() => resumed.replan('a', a.group.id, { version: ready.stateVersion, rejectedStopId: 'stop-1', reason: '再改' })).toThrow();
     expect(() => resumed.finalize('a', a.group.id, { version: ready.stateVersion, planId: 'plan-2' })).toThrow();
     expect(resumed.finalize('a', a.group.id, { version: ready.stateVersion, planId: 'plan-revised' }).state).toBe('finalized');
   });
@@ -265,5 +298,88 @@ describe('owner selection, replan and finalization', () => {
       stops: [{ ...plan(id).stops[0], placeId: 'west-bund-museum', latitude: 31.1744, longitude: 121.4605, cost: 0 }] } });
     repo.appendEvent(job.id, job.lease, { type: 'run.completed', result: { runId: job.id, consensus: { shared: [], conflicts: [], constraints: [] }, candidateIds: ['p1', 'p2', 'p3'] } });
     expect(() => repo.finishJob(job.id, job.lease, 'succeeded')).toThrow();
+  });
+  it('allows two logical replans with failed retries between them, rejects a third and never double-consumes', () => {
+    const { repo } = database(); const { a } = queued(repo); complete(repo, repo.claimJob()!);
+    let view = repo.view('a', a.group.id); view = repo.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-2', lockedStopIds: [] });
+    const input = { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '调整', reasonCode: 'CHANGE_PLACE' as const };
+    repo.replan('a', a.group.id, input); expect(() => repo.replan('a', a.group.id, input)).toThrow();
+    const first = repo.claimJob()!; expect(first.attempt).toBe(1); expect(first.replanRequest?.replanCount).toBe(0);
+    repo.finishJob(first.id, first.lease, 'failed'); repo.retry('a', a.group.id); const retry = repo.claimJob()!;
+    expect(retry.attempt).toBe(2); expect(retry.replanRequest).toEqual(first.replanRequest); expect(repo.view('a', a.group.id).replanCount).toBe(1);
+    complete(repo, retry, ['revised-1']); view = repo.view('a', a.group.id);
+    repo.replan('a', a.group.id, { version: view.stateVersion, rejectedStopId: 'stop-1-replacement', reason: '调整', reasonCode: 'CHANGE_PLACE' });
+    const second = repo.claimJob()!; expect(second.attempt).toBe(3); expect(second.replanRequest?.replanCount).toBe(1);
+    repo.finishJob(second.id, second.lease, 'failed'); repo.retry('a', a.group.id); const secondRetry = repo.claimJob()!;
+    expect(secondRetry.attempt).toBe(4); expect(secondRetry.replanRequest).toEqual(second.replanRequest);
+    complete(repo, secondRetry, ['revised-2']); view = repo.view('a', a.group.id); expect(view.replanCount).toBe(2);
+    expect(() => repo.replan('a', a.group.id, { version: view.stateVersion, rejectedStopId: 'stop-1-replacement-replacement', reason: '第三次' })).toThrow();
+  });
+  it('keeps all three current alternatives after replan and restart, allowing an untouched plan to finalize', () => {
+    const { repo, path } = database(); const { a } = queued(repo); complete(repo, repo.claimJob()!);
+    let view = repo.view('a', a.group.id); view = repo.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-2', lockedStopIds: [] });
+    repo.replan('a', a.group.id, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '调整', reasonCode: 'CHANGE_PLACE' }); complete(repo, repo.claimJob()!, ['revised']); repo.close();
+    const restarted = new GroupRepository({ path }); repos.push(restarted); view = restarted.view('b', a.group.id);
+    expect(view.candidates.map(p => p.id)).toEqual(['plan-1', 'revised', 'plan-3']);
+    expect(view.candidates[0].stops[0].placeId).toBe('shanghai-book-city'); expect(view.candidates[2].stops[0].placeId).toBe('fuxing-park');
+    expect(() => restarted.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-2', lockedStopIds: [] })).toThrow();
+    view = restarted.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-3', lockedStopIds: [] });
+    expect(restarted.finalize('a', a.group.id, { version: view.stateVersion, planId: 'plan-3' }).finalPlanId).toBe('plan-3');
+    expect(restarted.newRound('a', a.group.id, setup, 2).candidates).toEqual([]);
+  });
+  it('rejects three initial candidate IDs that repeat the same venue combination', () => {
+    const { repo } = database(); queued(repo); const job = repo.claimJob()!;
+    emitResult(repo, job, ['one', 'two', 'three'].map(id => plan(id)));
+    expect(() => repo.finishJob(job.id, job.lease, 'succeeded')).toThrow();
+  });
+  it('normalizes venue combination identity regardless of candidate stop ordering', () => {
+    const { repo } = database(); queued(repo); const job = repo.claimJob()!;
+    const venues = ['shanghai-book-city', 'jic-books-pujiang'];
+    const candidates = [venues, [...venues].reverse(), venues].map((pair, i) => recalculate({ ...plan(`order-${i}`), stops: pair.map((venue, index) => ({ ...plan('stop', venue).stops[0], id: `stop-${index}`, startTime: `${14 + index * 2}:00`, endTime: `${15 + index * 2}:00` })) }));
+    emitResult(repo, job, candidates); expect(() => repo.finishJob(job.id, job.lease, 'succeeded')).toThrow();
+  });
+  it.each(['unchanged', 'false-replaced', 'false-preserved', 'same-stop-id'])('rejects a replan with %s rather than a truthful replacement', invalid => {
+    const { repo } = database(); const { a } = queued(repo); complete(repo, repo.claimJob()!);
+    let view = repo.view('a', a.group.id); view = repo.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-2', lockedStopIds: [] });
+    repo.replan('a', a.group.id, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '调整', reasonCode: 'CHANGE_PLACE' }); const job = repo.claimJob()!;
+    const result = replacement(job);
+    if (invalid === 'unchanged') result.revised = { ...job.replanRequest!.plan, id: 'pretend-revised' };
+    if (invalid === 'false-replaced') result.diff.replacedStopIds = ['invented'];
+    if (invalid === 'false-preserved') result.diff.preservedStopIds = ['invented'];
+    if (invalid === 'same-stop-id') result.revised.stops[0].id = 'stop-1';
+    emitResult(repo, job, [result.revised], result.diff);
+    expect(() => repo.finishJob(job.id, job.lease, 'succeeded')).toThrow();
+  });
+  it.each(['far-timing', 'neighbor-duration', 'preserved-venue', 'locked-content', 'reordered', 'neighbor-overlap'])('rejects %s outside the saved local replacement permissions', invalid => {
+    const { repo } = database(); const { job, revised, diff } = localReplan(repo);
+    if (invalid === 'far-timing') { revised.stops[3].startTime = '16:15'; revised.stops[3].endTime = '16:45'; }
+    if (invalid === 'neighbor-duration') revised.stops[2].endTime = '15:45';
+    if (invalid === 'preserved-venue') revised.stops[2] = { ...plan('different', 'north-bund-aviation-center').stops[0], id: 'stop-3', startTime: '15:00', endTime: '15:30' };
+    if (invalid === 'locked-content') revised.stops[0].tags = ['伪造标签'];
+    if (invalid === 'reordered') [revised.stops[2], revised.stops[3]] = [revised.stops[3], revised.stops[2]];
+    if (invalid === 'neighbor-overlap') { revised.stops[2].startTime = '14:15'; revised.stops[2].endTime = '14:45'; }
+    emitResult(repo, job, [recalculate(revised)], diff);
+    expect(() => repo.finishJob(job.id, job.lease, 'succeeded')).toThrow();
+  });
+  it('accepts a real replacement with accurate preserved identities and only an unlocked neighbor shifted in time', () => {
+    const { repo } = database(); const { job, revised, diff } = localReplan(repo);
+    revised.stops[2].startTime = '15:15'; revised.stops[2].endTime = '15:45';
+    emitResult(repo, job, [revised], diff); repo.finishJob(job.id, job.lease, 'succeeded');
+    expect(repo.view('a', job.groupId).selectedPlanId).toBe('local-revised');
+  });
+  it('accepts the actual core local replan event stream without weakening replacement or lock checks', async () => {
+    const { repo } = database(); const { job } = localReplan(repo);
+    const handler = createReplanHandler({ now: () => new Date('2026-11-11T00:00:00Z') });
+    const response = await handler(new Request('http://localhost/api/replan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(job.replanRequest) }));
+    expect(response.status).toBe(200);
+    const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line) as AgentEvent);
+    for (const event of events) repo.appendEvent(job.id, job.lease, event);
+    repo.finishJob(job.id, job.lease, 'succeeded');
+    const view = repo.view('a', job.groupId);
+    expect(view.candidates).toHaveLength(3);
+    const revised = view.candidates.find(candidate => candidate.id === view.selectedPlanId)!;
+    expect(revised.stops[0]).toEqual(job.replanRequest!.plan.stops[0]);
+    expect(revised.stops[3]).toEqual(job.replanRequest!.plan.stops[3]);
+    expect(revised.stops[1].placeId).not.toBe('jic-books-pujiang');
   });
 });

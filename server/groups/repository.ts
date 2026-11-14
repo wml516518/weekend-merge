@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { AgentEventSchema, PersonPreferencesSchema, PlanSetupSchema, ReplanRequestSchema } from '../../src/contracts/agent';
-import type { AgentEvent, PersonPreferences, PlanSetup, Itinerary, ReplanRequest } from '../../src/contracts/agent';
+import type { AgentEvent, PersonPreferences, PlanSetup, Itinerary, PlanDiff, ReplanRequest } from '../../src/contracts/agent';
 import type { ClaimedGroupJob, FinalizeGroup, GroupCreated, GroupJoined, GroupJobView, GroupMember, GroupView, ReplanGroup, SaveGroupPreferences, SelectGroupPlan } from '../../src/contracts/groups';
 import { shanghaiPlaces } from '../../netlify/functions/agent/tools/places';
 import { estimateRoute } from '../../netlify/functions/agent/tools/route';
@@ -110,7 +110,7 @@ export class GroupRepository {
       state: group.state, createdAt: group.created_at, expiresAt: group.expires_at, inviteExpiresAt: group.invite_expires_at,
       canManage: grants.some(g => g.role === 'owner'), members: members.map(publicMember),
       myMembers: members.filter(m => (!memberId || memberId === m.id) && grants.some(g => g.role === 'member' && g.member_id === m.id)).map(m => ({ ...publicMember(m), version: m.version, ...(m.payload ? { preferences: JSON.parse(m.payload) as PersonPreferences } : {}) })),
-      job: this.jobView(this.latestJob(group)),
+      job: this.jobView(this.latestJob(group)), candidates: this.currentCandidates(group),
       ...(group.selected_plan_id ? { selectedPlanId: group.selected_plan_id } : {}), ...(group.final_plan_id ? { finalPlanId: group.final_plan_id } : {}),
       lockedStopIds: JSON.parse(group.locked_stop_ids), replanCount: group.replan_count,
     };
@@ -177,10 +177,23 @@ export class GroupRepository {
     check(group.state === 'ready', 'RESULT_NOT_READY'); return group;
   }
   private storedPlan(group: GroupRow, planId: string): Itinerary {
-    const job = this.latestJob(group); check(job?.state === 'succeeded', 'RESULT_NOT_READY');
-    const result = this.jobView(job)!;
-    check(result.result?.candidateIds.includes(planId), 'PLAN_UNAVAILABLE');
-    const plan = result.plans.find(p => p.id === planId); check(plan, 'PLAN_UNAVAILABLE'); return plan;
+    const plan = this.currentCandidates(group).find(p => p.id === planId); check(plan, 'PLAN_UNAVAILABLE'); return plan;
+  }
+  private successfulJobs(group: GroupRow): JobRow[] {
+    return this.all<JobRow>("SELECT * FROM jobs WHERE group_id=? AND revision=? AND state='succeeded' ORDER BY rowid", group.id, group.revision);
+  }
+  /** A successful local adjustment replaces its saved base, preserving the other two alternatives. */
+  private currentCandidates(group: GroupRow): Itinerary[] {
+    let plans: Itinerary[] = [];
+    for (const job of this.successfulJobs(group)) {
+      const result = this.jobView(job)!;
+      if (job.kind === 'plan') plans = result.plans;
+      else {
+        const request = JSON.parse(job.request) as ReplanRequest;
+        plans = plans.map(plan => plan.id === request.plan.id ? result.plans[0] : plan);
+      }
+    }
+    return plans;
   }
   select(session: string, groupId: string, input: SelectGroupPlan): GroupView {
     return this.tx(() => {
@@ -193,15 +206,16 @@ export class GroupRepository {
   replan(session: string, groupId: string, input: ReplanGroup): GroupView {
     return this.tx(() => {
       const group = this.readyOwner(session, groupId, input.version);
-      check(group.replan_count === 0 && group.selected_plan_id, 'REPLAN_UNAVAILABLE');
+      check(group.replan_count < 2 && group.selected_plan_id, 'REPLAN_UNAVAILABLE');
       const plan = this.storedPlan(group, group.selected_plan_id); const lockedStopIds: string[] = JSON.parse(group.locked_stop_ids);
       check(plan.stops.some(stop => stop.id === input.rejectedStopId) && !lockedStopIds.includes(input.rejectedStopId), 'INVALID_REJECTED_STOP');
       const snapshot = this.one<{ payload: string }>('SELECT payload FROM planning_snapshots WHERE group_id=? AND revision=?', groupId, group.revision)!;
       const original = JSON.parse(snapshot.payload) as ClaimedGroupJob['request'];
       const request = ReplanRequestSchema.parse({ sessionId: newId(), plan, lockedStopIds, rejectedStopId: input.rejectedStopId, reason: input.reason, reasonCode: input.reasonCode,
-        replanCount: 0, setup: original.setup, preferences: original.preferences });
-      this.enqueue(group, 'replan', 1, JSON.stringify(request));
-      this.run("UPDATE groups SET state='queued',replan_count=1,state_version=state_version+1 WHERE id=?", groupId);
+        replanCount: group.replan_count, setup: original.setup, preferences: original.preferences });
+      const attempt = this.one<{ attempt: number }>("SELECT COALESCE(MAX(attempt),0)+1 AS attempt FROM jobs WHERE group_id=? AND revision=? AND kind='replan'", groupId, group.revision)!.attempt;
+      this.enqueue(group, 'replan', attempt, JSON.stringify(request));
+      this.run("UPDATE groups SET state='queued',replan_count=replan_count+1,state_version=state_version+1 WHERE id=?", groupId);
       return this.view(session, groupId);
     });
   }
@@ -258,9 +272,39 @@ export class GroupRepository {
       this.run('INSERT INTO events VALUES(?,?,?,?)', job.group_id, jobId, sequence, JSON.stringify(parsed)); return sequence;
     });
   }
+  private validateReplacement(plan: Itinerary, diff: PlanDiff, request: ReplanRequest): void {
+    const original = request.plan;
+    const rejectedIndex = original.stops.findIndex(stop => stop.id === request.rejectedStopId);
+    const originalIds = original.stops.map(stop => stop.id);
+    const preservedIds = originalIds.filter(id => id !== request.rejectedStopId);
+    const sameIds = (actual: string[], expected: string[]) => actual.length === expected.length && new Set(actual).size === actual.length && expected.every(id => actual.includes(id));
+    check(rejectedIndex >= 0 && plan.id !== original.id && plan.stops.length === original.stops.length &&
+      sameIds(diff.replacedStopIds, [request.rejectedStopId]) && sameIds(diff.preservedStopIds, preservedIds), 'INVALID_REPLAN');
+    const replacement = plan.stops[rejectedIndex];
+    check(!originalIds.includes(replacement.id) && !original.stops.some(stop => stop.placeId === replacement.placeId), 'INVALID_REPLAN');
+    const locked = new Set([...request.lockedStopIds, ...original.stops.filter(stop => stop.locked).map(stop => stop.id)]);
+    check(!locked.has(request.rejectedStopId), 'INVALID_REPLAN');
+    const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+    const duration = (stop: Itinerary['stops'][number]) => minutes(stop.endTime) - minutes(stop.startTime);
+    for (const [index, before] of original.stops.entries()) {
+      const after = plan.stops[index];
+      check(duration(after) === duration(before), 'INVALID_REPLAN');
+      if (index === rejectedIndex) continue;
+      const mayShift = Math.abs(index - rejectedIndex) === 1 && !locked.has(before.id);
+      // Only immediate unlocked neighbors may change timing; every other field/position is preserved.
+      const comparable = mayShift ? { ...after, startTime: before.startTime, endTime: before.endTime } : after;
+      check(JSON.stringify(comparable) === JSON.stringify(before), 'INVALID_REPLAN');
+    }
+    if (plan.stops.length > 1) {
+      const route = estimateRoute({ stops: plan.stops, mode: 'mixed' });
+      for (const [index, leg] of route.legs.entries()) {
+        check(minutes(plan.stops[index + 1].startTime) >= minutes(plan.stops[index].endTime) + leg.durationMinutes, 'INVALID_REPLAN');
+      }
+    }
+  }
   finishJob(jobId: string, lease: string, state: 'succeeded' | 'failed', error?: string): void {
     this.tx(() => {
-      const { job } = this.leased(jobId, lease); check(state === 'succeeded' || state === 'failed', 'INVALID_JOB_STATE');
+      const { job, group } = this.leased(jobId, lease); check(state === 'succeeded' || state === 'failed', 'INVALID_JOB_STATE');
       const events = this.jobView(job)!;
       const completed = events.events.filter(e => e.event.type === 'run.completed').at(-1)?.event;
       if (state === 'succeeded') {
@@ -270,6 +314,17 @@ export class GroupRepository {
         const snapshot = this.one<{ payload: string }>('SELECT payload FROM planning_snapshots WHERE group_id=? AND revision=?', job.group_id, job.revision)!;
         const request = JSON.parse(snapshot.payload) as ClaimedGroupJob['request'];
         const replan = job.kind === 'replan' ? JSON.parse(job.request) as ReplanRequest : undefined;
+        if (!replan) {
+          const combinations = events.plans.map(plan => JSON.stringify([...new Set(plan.stops.map(stop => stop.placeId))].sort()));
+          check(new Set(combinations).size === 3, 'INVALID_CANDIDATES');
+        } else {
+          check(completed.result.diff, 'INVALID_REPLAN');
+          this.validateReplacement(events.plans[0], completed.result.diff, replan);
+          const current = this.currentCandidates(group);
+          check(current.length === 3 && JSON.stringify(current.find(plan => plan.id === replan.plan.id)) === JSON.stringify(replan.plan), 'INVALID_REPLAN');
+          const priorIds = this.successfulJobs(group).flatMap(previous => this.jobView(previous)!.plans.map(plan => plan.id));
+          check(!priorIds.includes(events.plans[0].id), 'INVALID_REPLAN');
+        }
         for (const plan of events.plans) {
           const venues = plan.stops.map(stop => shanghaiPlaces.find(place => place.placeId === stop.placeId));
           check(venues.every(Boolean), 'INVALID_PLAN');
