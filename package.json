@@ -7,7 +7,7 @@
     "node": ">=22.11.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "node --experimental-sqlite node_modules/vite/bin/vite.js",
     "build": "tsc -b && tsc --noEmit -p tsconfig.functions.json && vite build && npm run build:server",
     "preview": "vite preview",
     "test": "vitest --passWithNoTests",

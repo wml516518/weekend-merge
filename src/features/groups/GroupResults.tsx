@@ -132,9 +132,13 @@ export function GroupResults({
       )}
       {summary && (
         <section className="group-consensus">
-          <h2>大家的兴趣交集</h2>
+          <h2>大家的兴趣支持</h2>
           <p>依据本轮已提交的偏好生成；成员兴趣覆盖见各方案说明。</p>
-          {summary.shared.length ? (
+          {summary.interestSupport?.length ? (
+            summary.interestSupport.map(({ interest, count, total }) => (
+              <p key={interest}>{interest} · {count}/{total} 人支持</p>
+            ))
+          ) : summary.shared.length ? (
             summary.shared.map((s) => (
               <p key={s}>
                 {s} · {group.members.length}/{group.members.length} 人共同支持

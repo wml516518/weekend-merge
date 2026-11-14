@@ -33,6 +33,7 @@ export function GroupApp() {
   const [group, setGroup] = useState<GroupView>();
   const [memberId, setMember] = useState("");
   const [error, setError] = useState("");
+  const [pollError, setPollError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState("");
@@ -82,6 +83,7 @@ export function GroupApp() {
     };
   }, [loadList]);
   function leaveContext() {
+    setPollError("");
     navigationVersion.current++;
     actionVersion.current++;
     requestVersion.current++;
@@ -152,7 +154,13 @@ export function GroupApp() {
     if (!activeId) return;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
+    let nextPollAt = 0;
     const refresh = async () => {
+      clearTimeout(timer);
+      if (Date.now() < nextPollAt) {
+        timer = setTimeout(refresh, nextPollAt - Date.now());
+        return;
+      }
       if (mutating.current) {
         timer = setTimeout(refresh, document.hidden ? 15000 : 3000);
         return;
@@ -170,6 +178,7 @@ export function GroupApp() {
           requestVersion.current === version
         ) {
           setGroup(value);
+          setPollError("");
           setMember((old) =>
             value.myMembers.some((m) => m.id === old)
               ? old
@@ -182,11 +191,14 @@ export function GroupApp() {
           !disposed &&
           !controller.signal.aborted &&
           requestVersion.current === version
-        )
-          setError(e instanceof Error ? e.message : "更新失败。");
+        ) {
+          setPollError(e instanceof Error ? e.message : "更新失败。");
+          if (e instanceof GroupApiError && e.retryAfterMs)
+            nextPollAt = Date.now() + e.retryAfterMs;
+        }
       } finally {
         if (!disposed)
-          timer = setTimeout(refresh, document.hidden ? 15000 : 3000);
+          timer = setTimeout(refresh, Math.max(nextPollAt - Date.now(), document.hidden ? 15000 : 3000));
       }
     };
     const visibility = () => {
@@ -364,9 +376,9 @@ export function GroupApp() {
         </nav>
       </header>
       <div className="group-content">
-        {error && (
+        {(error || pollError) && (
           <div className="group-notice" role="alert">
-            {error}
+            {error || pollError}
             {activeId && (
               <button
                 className="text-button"
@@ -428,7 +440,7 @@ export function GroupApp() {
                 onChange={(e) => setNickname(e.target.value)}
               />
             </label>
-            <button className="button primary" disabled={busy}>
+            <button className="button primary" disabled={busy || loading}>
               {handoff ? "确认新增独立成员" : "加入计划"}
             </button>
             {handoff && (
@@ -449,7 +461,7 @@ export function GroupApp() {
               group={group}
               memberId={memberId}
               onMember={setMember}
-              busy={busy}
+              busy={busy || loading}
               mutate={mutate}
               expired={Date.now() >= group.expiresAt}
               inviteAvailable={!!links.invite && inviteValid}
@@ -527,7 +539,7 @@ export function GroupApp() {
               </section>
             </section>
             <GroupCreate
-              busy={busy}
+              busy={busy || loading}
               onSubmit={(value) =>
                 action(async (current) => {
                   const result = await groupClient.create(value);

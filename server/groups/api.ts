@@ -1,5 +1,5 @@
 import { z, ZodError } from 'zod';
-import { PersonPreferencesSchema, PlanSetupSchema, ReplanReasonCodeSchema } from '../../src/contracts/agent';
+import { PersonPreferencesSchema, PlanSetupSchema, ReplanReasonCodeSchema, ReplanReasonSchema } from '../../src/contracts/agent';
 import { validateRequestDate } from '../../netlify/functions/agent/requestProtection';
 import { digest, GroupError, newToken } from './auth';
 import type { GroupRepository } from './repository';
@@ -34,7 +34,7 @@ const joinSchema = z.object({ token, nickname: name, handoff: z.boolean().option
 const recoverSchema = z.object({ token }).strict();
 const saveSchema = z.object({ memberId: z.string().uuid(), version, preferences: PersonPreferencesSchema, submit: z.boolean(), idempotencyKey: z.string().min(1).max(128) }).strict();
 const selectSchema = z.object({ version, planId: z.string().min(1).max(200), lockedStopIds: z.array(z.string().min(1).max(200)).max(10) }).strict();
-const replanSchema = z.object({ version, rejectedStopId: z.string().min(1).max(200), reason: z.string().trim().min(1).max(500), reasonCode: ReplanReasonCodeSchema.optional() }).strict();
+const replanSchema = z.object({ version, rejectedStopId: z.string().min(1).max(200), reason: z.string().trim().pipe(ReplanReasonSchema), reasonCode: ReplanReasonCodeSchema.optional() }).strict();
 const finalizeSchema = z.object({ version, planId: z.string().min(1).max(200) }).strict();
 
 class HttpError extends Error { constructor(readonly status: number, readonly code: string) { super(code); } }
@@ -86,9 +86,10 @@ export async function readGroupJsonBody(request: Request): Promise<unknown> {
 function limiter() {
   const entries = new Map<string, { until: number; count: number }>();
   return {
-    allow(keys: string[], now: number, max: number, windowMs: number): boolean {
+    allow(budgets: { key: string; max: number }[], now: number, windowMs: number): boolean {
+      const keys = budgets.map(budget => budget.key);
       for (const [key, entry] of entries) if (entry.until <= now) entries.delete(key);
-      if (keys.some(key => (entries.get(key)?.count ?? 0) >= max)) return false;
+      if (budgets.some(({ key, max }) => (entries.get(key)?.count ?? 0) >= max)) return false;
       if (entries.size + keys.filter(key => !entries.has(key)).length > 5000) return false;
       for (const key of keys) {
         const entry = entries.get(key) ?? { until: now + windowMs, count: 0 };
@@ -105,13 +106,13 @@ export function createGroupApi(repo: GroupRepository, options: GroupApiOptions =
   const secure = new URL(origin).protocol === 'https:';
   const cookieName = secure ? '__Host-weekend_group' : 'weekend_group_dev';
   const now = options.now ?? Date.now;
-  const regular = limiter(); const expensive = limiter();
+  const reads = limiter(); const mutations = limiter(); const expensive = limiter();
   let closed = false;
   function validateDate(date: string) {
     if (validateRequestDate(date, new Date(now()))) throw new HttpError(400, 'INVALID_DATE');
   }
   return {
-    close() { closed = true; regular.close(); expensive.close(); },
+    close() { closed = true; reads.close(); mutations.close(); expensive.close(); },
     async handle(request: Request, clientKey: string): Promise<Response> {
       let issued: string | undefined;
       let response: Response;
@@ -136,9 +137,14 @@ export function createGroupApi(repo: GroupRepository, options: GroupApiOptions =
         if (!/^[A-Za-z0-9_-]{43}$/.test(credential)) { credential = newToken(); issued = credential; }
         const session = digest(credential);
         const ip = digest(clientKey.slice(0, 512) || 'unknown');
-        if (!regular.allow([`ip:${ip}`, `browser:${session}`], now(), 120, 60_000)) throw new HttpError(429, 'RATE_LIMITED');
+        // Two six-member groups use 240 polls/minute. Leave room for lists,
+        // visibility refreshes and other groups without letting reads block saves.
+        if (!(read ? reads : mutations).allow([
+          { key: `ip:${ip}`, max: read ? 1200 : 120 },
+          { key: `browser:${session}`, max: read ? 120 : 60 },
+        ], now(), 60_000)) throw new HttpError(429, 'RATE_LIMITED');
         if (!read && (route === 'root' || ['round', 'retry', 'replan'].includes(route)) &&
-            !expensive.allow([`ip:${ip}`, `browser:${session}`], now(), 5, 600_000)) throw new HttpError(429, 'RATE_LIMITED');
+            !expensive.allow([{ key: `ip:${ip}`, max: 5 }, { key: `browser:${session}`, max: 5 }], now(), 600_000)) throw new HttpError(429, 'RATE_LIMITED');
         const body = read ? undefined : await readGroupJsonBody(request);
         let value: unknown; let status = 200;
         if (route === 'root') {

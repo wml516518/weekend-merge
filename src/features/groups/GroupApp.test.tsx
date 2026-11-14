@@ -402,6 +402,20 @@ it("renders all three current candidates for nonowners, with persisted provenanc
   ).not.toBeInTheDocument();
 });
 
+it("renders partial interest support counts from the public consensus without member answers", async () => {
+  current = group({ state: "ready", job: { id: "j", kind: "plan", state: "succeeded", attempt: 1, plans: [], events: [],
+    result: { runId: "j", candidateIds: [], consensus: { shared: [], conflicts: [], constraints: [],
+      interestSupport: [{ interest: "展览", count: 5, total: 6 }, { interest: "咖啡", count: 1, total: 6 }],
+    } },
+  } });
+  groups = [current];
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.click(await screen.findByRole("button", { name: "打开 梧桐周末" }));
+  expect(screen.getByText("展览 · 5/6 人支持")).toBeInTheDocument();
+  expect(screen.getByText("咖啡 · 1/6 人支持")).toBeInTheDocument();
+});
+
 it("selects and finalizes with stateVersion and displays the server final plan", async () => {
   const candidates = getCandidates(createDemoRun({ runId: "group-test" }));
   current = group({
@@ -505,6 +519,28 @@ it("refreshes immediately on visibility changes and uses a slower hidden poll", 
     fireEvent(document, new Event("visibilitychange"));
   });
   expect(vi.mocked(fetch).mock.calls.length).toBe(initial + 3);
+});
+
+it("backs off rate-limited polling across visibility changes and clears its error on recovery", async () => {
+  vi.useFakeTimers();
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  let reads = 0;
+  vi.mocked(fetch).mockImplementation((path, options) => {
+    if (path === "/api/groups/g1" && ++reads === 1)
+      return Promise.resolve(Response.json({ error: { code: "RATE_LIMITED", message: "稍后重试轮询" } },
+        { status: 429, headers: { "Retry-After": "12" } }));
+    return original(path, options);
+  });
+  render(<GroupApp />);
+  await act(async () => {});
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "打开 梧桐周末" })); });
+  expect(screen.getByRole("alert")).toHaveTextContent("稍后重试轮询");
+  await act(async () => { await vi.advanceTimersByTimeAsync(3000); fireEvent(document, new Event("visibilitychange")); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(8999); });
+  expect(reads).toBe(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(reads).toBe(2);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("recovery restores management without adding a personal identity, and round reset requires reconfirmation", async () => {

@@ -13,11 +13,12 @@ export class GroupApiError extends Error {
   constructor(
     public code: string,
     message: string,
+    public retryAfterMs?: number,
   ) {
     super(message);
   }
 }
-async function request<T>(
+async function send<T>(
   path: string,
   body?: unknown,
   signal?: AbortSignal,
@@ -38,13 +39,34 @@ async function request<T>(
     throw new GroupApiError(
       value.error?.code ?? "REQUEST_FAILED",
       value.error?.message ?? "请求失败，请稍后重试。",
+      response.status === 429 ? retryDelay(response.headers.get("Retry-After")) : undefined,
     );
   return value as T;
+}
+function retryDelay(value: string | null): number {
+  if (!value) return 60_000;
+  const seconds = Number(value);
+  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(delay) && delay > 0 ? Math.min(delay, 2_147_483_647) : 60_000;
+}
+// The first cookieless response must be delivered before any other request can
+// receive a grant. Do not abort this shared bootstrap during StrictMode cleanup
+// or navigation: aborting a fetch cannot fence browser Set-Cookie delivery.
+let sessionBootstrap: Promise<{ groups: GroupView[] }> | undefined;
+function bootstrap() {
+  return sessionBootstrap ??= send<{ groups: GroupView[] }>("").catch(error => {
+    sessionBootstrap = undefined;
+    throw error;
+  });
+}
+async function request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  await bootstrap();
+  return send<T>(path, body, signal);
 }
 const id = encodeURIComponent;
 export const groupClient = {
   list: (signal?: AbortSignal) =>
-    request<{ groups: GroupView[] }>("", undefined, signal),
+    sessionBootstrap ? request<{ groups: GroupView[] }>("", undefined, signal) : bootstrap(),
   get: (groupId: string, signal?: AbortSignal) =>
     request<GroupView>(`/${id(groupId)}`, undefined, signal),
   create: (input: {

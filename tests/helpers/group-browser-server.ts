@@ -12,6 +12,7 @@ let release!: () => void;
 const gate = new Promise<void>(done => { release = done; });
 const started: string[] = [];
 const completed: string[] = [];
+const bootstraps = new Map<string, () => void>();
 const runner = createDefaultGroupRunner({ env: {} }); // No credentials or external requests.
 const runtime = createGroupRuntime({ path: process.env.GROUP_DB_PATH!, publicOrigin: origin, development: true, env: {}, run: async (job, emit) => {
   started.push(job.groupId); await gate; await runner(job, emit); completed.push(job.groupId);
@@ -19,11 +20,18 @@ const runtime = createGroupRuntime({ path: process.env.GROUP_DB_PATH!, publicOri
 const server = createServer(async (incoming, outgoing) => {
   try {
     const url = new URL(incoming.url ?? '/', origin);
+    const gateId = url.searchParams.get('gate') ?? '';
+    if (url.pathname === '/__test/bootstrap') { outgoing.setHeader('Content-Type', 'application/json'); outgoing.end(JSON.stringify({ held: bootstraps.has(gateId) })); return; }
+    if (url.pathname === '/__test/release-bootstrap' && incoming.method === 'POST') { bootstraps.get(gateId)?.(); bootstraps.delete(gateId); outgoing.end('ok'); return; }
     if (url.pathname === '/__test/release' && incoming.method === 'POST') { release(); outgoing.end('ok'); return; }
     if (url.pathname === '/__test/runs') { outgoing.setHeader('Content-Type', 'application/json'); outgoing.end(JSON.stringify({ started, completed })); return; }
     const init: RequestInit & { duplex?: 'half' } = { method: incoming.method, headers: incoming.headers as Record<string, string> };
     if (!['GET', 'HEAD'].includes(incoming.method!)) { init.body = Readable.toWeb(incoming) as ReadableStream<Uint8Array>; init.duplex = 'half'; }
     const response = await runtime.handle(new Request(url, init), 'controlled-loopback');
+    const bootstrapGate = incoming.headers['x-test-bootstrap-gate'];
+    if (response && url.pathname === '/api/groups' && incoming.method === 'GET' && !incoming.headers.cookie && typeof bootstrapGate === 'string') {
+      await new Promise<void>(done => { bootstraps.set(bootstrapGate, done); });
+    }
     if (response) { outgoing.writeHead(response.status, Object.fromEntries(response.headers)); outgoing.end(Buffer.from(await response.arrayBuffer())); return; }
     const path = url.pathname.startsWith('/assets/') ? url.pathname : '/index.html';
     outgoing.setHeader('Content-Type', ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html' } as Record<string, string>)[extname(path)] ?? 'application/octet-stream');

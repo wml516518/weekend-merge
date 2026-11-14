@@ -53,6 +53,7 @@ export const PublicConstraintCodeSchema = z.enum([
 ]);
 export type PublicConstraintCode = z.infer<typeof PublicConstraintCodeSchema>;
 export type ReplanReasonCode = z.infer<typeof ReplanReasonCodeSchema>;
+export const ReplanReasonSchema = z.string().min(1).max(160);
 
 export const PersonPreferencesSchema = z.object({
   interests: z.array(InterestSchema).min(1).max(5),
@@ -72,6 +73,10 @@ export const PersonPreferencesSchema = z.object({
 
 export const ConsensusSummarySchema = z.object({
   shared: z.array(z.string()),
+  // Optional so previously persisted events/results remain readable.
+  interestSupport: z.array(z.object({ interest: InterestSchema, count: z.number().int().min(1).max(6),
+    total: z.number().int().min(2).max(6),
+  }).refine(row => row.count <= row.total)).max(9).optional(),
   conflicts: z.array(z.string()),
   constraints: z.array(z.string()),
 });
@@ -151,7 +156,7 @@ export const ReplanRequestSchema = z.object({
   plan: ItinerarySchema,
   lockedStopIds: z.array(z.string()).max(10),
   rejectedStopId: z.string().min(1),
-  reason: z.string().min(1).max(160),
+  reason: ReplanReasonSchema,
   reasonCode: ReplanReasonCodeSchema.optional(),
   replanCount: z.number().finite().int().min(0).max(1),
   setup: PlanSetupSchema,

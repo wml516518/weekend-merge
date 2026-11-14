@@ -8,6 +8,13 @@ import { effectiveWalkingLimitKm } from "../tools/preferences";
 
 export function analyzeConsensus(request: Pick<PlanRequest, "setup" | "preferences">): ConsensusSummary {
   const people = getParticipants(request.preferences);
+  const support = new Map<string, number>();
+  for (const person of people) {
+    for (const interest of new Set(person.preferences.interests))
+      support.set(interest, (support.get(interest) ?? 0) + 1);
+  }
+  const interestSupport = [...support].map(([interest, count]) => ({ interest, count, total: people.length }))
+    .sort((a, b) => b.count - a.count || a.interest.localeCompare(b.interest, 'zh-CN'));
   const shared = people.length >= 2 ? people[0].preferences.interests.filter((interest) =>
     people.slice(1).every((person) => person.preferences.interests.includes(interest))) : [];
   const conflicts: string[] = [];
@@ -26,5 +33,5 @@ export function analyzeConsensus(request: Pick<PlanRequest, "setup" | "preferenc
     `活动时间 ${request.setup.startTime}-${request.setup.endTime}`,
     ...avoided.map((tag) => `避开：${tag}`),
   ];
-  return ConsensusSummarySchema.parse({ shared, conflicts, constraints });
+  return ConsensusSummarySchema.parse({ shared, interestSupport, conflicts, constraints });
 }

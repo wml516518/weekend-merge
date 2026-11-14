@@ -135,6 +135,7 @@ with sync_playwright() as p:
     assert data(owner6, id6)['state'] == 'collecting'
     assert 'job' not in data(owner6, id6)
     form(members6[-1][1])
+    members6[-1][1].get_by_role('checkbox', name='展览', exact=True).press('Space')
     submit(member2page)
     submit(members6[-1][1])
     owner6page.wait_for_timeout(1400)
@@ -168,6 +169,8 @@ with sync_playwright() as p:
     expect(owner2page.get_by_role('region', name='共同规划结果')).to_be_visible(timeout=12000)
     expect(owner6page.get_by_role('region', name='共同规划结果')).to_be_visible(timeout=12000)
     expect(member2page.get_by_role('region', name='共同规划结果')).to_be_visible(timeout=12000)
+    expect(owner6page.get_by_text('展览 · 5/6 人支持', exact=True)).to_be_visible()
+    expect(owner6page.get_by_text('咖啡 · 6/6 人支持', exact=True)).to_be_visible()
     assert len(data(owner6, id6)['candidates']) == 3
     assert not member2page.get_by_role('button', name='确认最终行程', exact=True).count()
     for ctx, gid in [(owner2, id2), (owner6, id6)]:
@@ -210,6 +213,58 @@ with sync_playwright() as p:
     expect(owner2page.get_by_text('2 人总计', exact=True)).to_be_visible()
     assert len(owner2.request.get(BASE + '/__test/runs').json()['started']) == 3
     checks.append('fragment removal; personal and management recovery roles separate; reload never rebills')
+
+    # Hold the real server response before Set-Cookie delivery. Attempt recovery,
+    # create and join while it is held; no identity request may cross this fence.
+    def delayed_bootstrap(kind, url=BASE):
+        ctx = context()
+        ctx.set_extra_http_headers({'X-Test-Bootstrap-Gate': kind})
+        page = ctx.new_page()
+        page.on('pageerror', lambda error: failures.append(redact_capabilities(error)))
+        sent = []
+        page.on('request', lambda request: sent.append(request.method) if request.url.startswith(BASE + '/api/groups') and request.method == 'POST' else None)
+        page.goto(url, wait_until='domcontentloaded')
+        for _ in range(30):
+            if owner2.request.get(BASE + '/__test/bootstrap?gate=' + kind).json()['held']:
+                break
+            page.wait_for_timeout(50)
+        assert owner2.request.get(BASE + '/__test/bootstrap?gate=' + kind).json()['held']
+        return ctx, page, sent
+    def release_bootstrap(kind, page, sent):
+        page.wait_for_timeout(350)
+        assert sent == [], kind + ' crossed bootstrap before Set-Cookie'
+        owner2.request.post(BASE + '/__test/release-bootstrap?gate=' + kind)
+        page.wait_for_load_state('networkidle')
+
+    delayed_recovery, delayed_recovery_page, sent = delayed_bootstrap('recover', personal2)
+    release_bootstrap('recover', delayed_recovery_page, sent)
+    expect(delayed_recovery_page.get_by_text('2 人总计', exact=True)).to_be_visible()
+    assert len(data(delayed_recovery, id2)['myMembers']) == 1
+
+    delayed_owner, delayed_owner_page, sent = delayed_bootstrap('create')
+    delayed_owner_page.get_by_label('计划名称', exact=True).fill('延迟会话计划')
+    delayed_owner_page.get_by_label('我的昵称', exact=True).fill('延迟发起人')
+    delayed_owner_page.get_by_label('日期', exact=True).fill(DATE)
+    expect(delayed_owner_page.get_by_role('button', name='创建并邀请', exact=True)).to_be_disabled()
+    delayed_owner_page.get_by_role('button', name='创建并邀请', exact=True).evaluate('(button) => button.form.requestSubmit()')
+    release_bootstrap('create', delayed_owner_page, sent)
+    expect(delayed_owner_page.get_by_label('邀请链接', exact=True)).to_be_visible()
+    delayed_invite = delayed_owner_page.get_by_label('邀请链接', exact=True).input_value()
+    delayed_id = delayed_owner_page.url.split('#group=')[1]
+    assert data(delayed_owner, delayed_id)['canManage']
+
+    delayed_member, delayed_member_page, sent = delayed_bootstrap('join', delayed_invite)
+    delayed_member_page.get_by_label('加入昵称', exact=True).fill('延迟成员')
+    expect(delayed_member_page.get_by_role('button', name='加入计划', exact=True)).to_be_disabled()
+    delayed_member_page.get_by_role('button', name='加入计划', exact=True).evaluate('(button) => button.form.requestSubmit()')
+    release_bootstrap('join', delayed_member_page, sent)
+    expect(delayed_member_page.get_by_role('button', name='填写我的偏好', exact=True)).to_be_visible()
+    assert len(data(delayed_member, delayed_id)['myMembers']) == 1
+    delayed_member_page.wait_for_timeout(3400)
+    assert not delayed_member_page.get_by_role('alert').count()
+    assert len(data(delayed_recovery, id2)['myMembers']) == 1
+    assert data(delayed_owner, delayed_id)['canManage']
+    checks.append('real delayed initial Set-Cookie fences recovery/create/join; fresh grants survive subsequent polls; partial support shown')
     assert all(not any('invite=' in str(value) or 'recover=' in str(value) for value in ctx.storage_state()['origins']) for ctx in contexts)
     assert not failures, failures
     (OUT / 'task5-browser-evidence.json').write_text(json.dumps({'checks': checks, 'contexts': len(contexts), 'pageErrors': failures, 'provider': 'controlled gate + real default rule runner; no external requests', 'date': DATE}, ensure_ascii=False, indent=2))

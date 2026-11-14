@@ -151,11 +151,57 @@ describe('authorized group HTTP', () => {
     expect(blocked.headers.get('retry-after')).toBeTruthy();
     expect((await jar('different-ip').request('', { name: '组', nickname: '甲', targetCount: 2, setup })).status).toBe(201);
   });
+  it.each([[0, 400], [160, 409], [161, 400]] as const)('validates replan reason length %s at the HTTP boundary before checking result state', async (length, status) => {
+    const { jar } = fixture(); const owner = jar(); const a = await create(owner);
+    const response = await owner.request(`/${a.group.id}/replan`, { version: 0, rejectedStopId: 'stop-1', reason: '换'.repeat(length) });
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ error: { code: status === 400 ? 'INVALID_REQUEST' : 'RESULT_NOT_READY' } });
+    expect(await (await owner.request(`/${a.group.id}`)).json()).toMatchObject({ state: 'collecting', replanCount: 0 });
+  });
   it('limits inexpensive reads without adding jobs', async () => {
     const { jar } = fixture(); const browser = jar(); await create(browser);
     let response: Response | undefined;
     for (let i = 0; i < 121; i++) response = await browser.request();
     expect(response!.status).toBe(429);
+  });
+  it('keeps two six-person groups polling on one IP without starving member saves or submissions', async () => {
+    let clock = instant;
+    const { jar } = fixture({ now: () => clock });
+    const seats: { browser: ReturnType<typeof jar>; groupId: string; memberId: string }[] = [];
+    for (let g = 0; g < 2; g++) {
+      const owner = jar('shared-wifi');
+      const response = await owner.request('', { name: '六人计划', nickname: '甲', targetCount: 6, setup });
+      expect(response.status).toBe(201);
+      const created = await response.json() as GroupCreated;
+      seats.push({ browser: owner, groupId: created.group.id, memberId: created.memberId });
+      for (let i = 1; i < 6; i++) {
+        const browser = jar('shared-wifi');
+        const joined = await browser.request('/join', { token: created.inviteToken, nickname: `成员${i}` });
+        expect(joined.status).toBe(200);
+        const value = await joined.json() as GroupJoined;
+        seats.push({ browser, groupId: created.group.id, memberId: value.memberId });
+      }
+    }
+    expect(new Set(seats.map(seat => seat.browser.cookie)).size).toBe(12);
+    for (const seat of seats) expect((await seat.browser.request()).status).toBe(200);
+    for (let seconds = 0; seconds <= 60; seconds += 3) {
+      clock = instant + seconds * 1000;
+      for (const seat of seats) expect((await seat.browser.request(`/${seat.groupId}`)).status).toBe(200);
+      if (seconds === 30) {
+        const seat = seats[5];
+        expect((await seat.browser.request(`/${seat.groupId}/preferences`, { memberId: seat.memberId, version: 0, preferences, submit: false, idempotencyKey: 'wifi-draft' })).status).toBe(200);
+        const submitted = await seat.browser.request(`/${seat.groupId}/preferences`, { memberId: seat.memberId, version: 1, preferences, submit: true, idempotencyKey: 'wifi-submit' });
+        expect(submitted.status).toBe(200);
+        expect(await submitted.json()).toMatchObject({ myMembers: [{ submitted: true, version: 2 }] });
+      }
+    }
+  });
+  it('bounds aggregate read abuse across fresh cookies without spending the mutation budget', async () => {
+    const { jar } = fixture();
+    const owner = jar('shared-ip'); const created = await create(owner);
+    for (let i = 0; i < 1200; i++) expect((await jar('shared-ip').request()).status).toBe(200);
+    expect((await jar('shared-ip').request()).status).toBe(429);
+    expect((await owner.request(`/${created.group.id}/preferences`, { memberId: created.memberId, version: 0, preferences, submit: false, idempotencyKey: 'read-independent' })).status).toBe(200);
   });
   it('rejects stale-date submissions and retries without sending the snapshot upstream', async () => {
     let clock = instant; const { jar } = fixture({ now: () => clock }); const owner = jar(); const a = await create(owner);
@@ -185,7 +231,9 @@ describe('authorized group HTTP', () => {
     expect((await member.request(`/${a.group.id}/select`, { version: view.stateVersion, planId: 'plan-0', lockedStopIds: [] })).status).toBe(403);
     view = await (await owner.request(`/${a.group.id}/select`, { version: view.stateVersion, planId: 'plan-0', lockedStopIds: [] })).json() as GroupView;
     expect((await owner.request(`/${a.group.id}/replan`, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '换个地点', reasonCode: 'CHANGE_PLACE', preferences })).status).toBe(400);
-    view = await (await owner.request(`/${a.group.id}/replan`, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '换个地点', reasonCode: 'CHANGE_PLACE' })).json() as GroupView;
+    const tooLong = await owner.request(`/${a.group.id}/replan`, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '换'.repeat(161), reasonCode: 'CHANGE_PLACE' });
+    expect(tooLong.status).toBe(400);
+    view = await (await owner.request(`/${a.group.id}/replan`, { version: view.stateVersion, rejectedStopId: 'stop-1', reason: '换'.repeat(160), reasonCode: 'CHANGE_PLACE' })).json() as GroupView;
     expect(view.state).toBe('queued'); expect(view.replanCount).toBe(1);
     const { createDefaultGroupRunner } = await import('./worker');
     worker = new GroupWorker(repo, { run: createDefaultGroupRunner({ now: () => new Date(instant), env: {} }) }); await worker.tick(); await worker.stop();

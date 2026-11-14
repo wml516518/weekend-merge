@@ -124,6 +124,26 @@ describe("group planning contracts and real core", () => {
     expect(plans[0].reasons.join(" ")).toContain("5/6");
     expect(plans[0].reasons.join(" ")).not.toMatch(/双方共同|全员共同/);
     expect(analyzeConsensus(input).shared).toEqual([]);
+    expect(analyzeConsensus(input)).toMatchObject({ interestSupport: [
+      { interest: "展览", count: 5, total: 6 }, { interest: "咖啡", count: 1, total: 6 },
+    ] });
+    expect(JSON.stringify(analyzeConsensus(input))).not.toMatch(/wish-|food-|private-nickname/);
+  });
+
+  it("scores model plans by member support rather than the number of distinct interests", async () => {
+    const input = request();
+    input.preferences.participants[0].preferences = { ...basePreferences, interests: ["咖啡"] };
+    const catalog = Array.from({ length: 4 }, (_, index) => ({ ...places[index],
+      tags: [index < 2 ? "展览" : "咖啡"],
+    }));
+    const plans = [proposal(catalog.slice(0, 2), "majority"), proposal(catalog.slice(2), "minority"), proposal([catalog[0], catalog[2]], "mixed")];
+    const events = await runPlanningAgent(input, { places: catalog, model: { next: async () => ({ type: "final", plans, consensus: { shared: [], conflicts: [], constraints: [] } }) } });
+    const actual = proposed(events);
+    expect(actual).toHaveLength(3);
+    expect(actual.map(plan => plan.matchScore)).toEqual([93, 67, 80]);
+    expect(events.at(-1)).toMatchObject({ type: "run.completed", result: { consensus: { interestSupport: [
+      { interest: "展览", count: 5, total: 6 }, { interest: "咖啡", count: 1, total: 6 },
+    ] } } });
   });
 
   it("ranks broad member coverage ahead of one member's interests even when all venues are equally near", () => {

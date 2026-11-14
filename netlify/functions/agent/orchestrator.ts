@@ -10,7 +10,7 @@ import { createRulePlans, NoValidPlanError } from "./fallbacks/rulePlanner";
 import { ModelFinalSchema, type AgentModel, type ModelInput } from "./model";
 import { PlaceListSchema, type Place } from "./tools/contracts";
 import { shanghaiPlaces } from "./tools/places";
-import { interestCoverageReason, interestMatchesTags } from "./tools/preferences";
+import { interestCoverage, interestCoverageReason } from "./tools/preferences";
 import { parsePlaceSearchInput } from "./tools/placeSearchInput";
 import { createAgentTools, toolInputSchemas, weatherScopeForRequest, type AgentTools } from "./tools/registry";
 import { AgentToolError, type WeatherOutput } from "./tools/weather";
@@ -205,17 +205,11 @@ export async function runPlanningAgent(input: PlanRequest, dependencies: {
         if (leg.mode === "transit") items.push({ category: "transport", label: "交通预算", unitPrice: 4, quantity: participantCount });
       }
       const budget = await tools.calculate_budget(toolInputSchemas.calculate_budget.parse({ items, budgetLimit: request.setup.budget, bufferRate: 0.1 }));
-      const interestSupport = new Map<string, number>();
-      for (const person of normalizedPreferences.participants) {
-        for (const interest of person.preferences.interests) interestSupport.set(interest, (interestSupport.get(interest) ?? 0) + 1);
-      }
-      const interests = [...interestSupport.keys()];
-      const sharedHits = venues.reduce((sum, venue) => sum + consensus.shared.filter((interest) => interestMatchesTags(interest, venue.tags)).length, 0);
-      const interestHits = venues.reduce((sum, venue) => sum + interests.filter((interest) => interestMatchesTags(interest, venue.tags)).length, 0);
+      const coverage = interestCoverage(normalizedPreferences.participants, venues);
       const plan = ItinerarySchema.parse({ ...proposal,
         ...(fromModel ? {
           id: planId, title: `方案 ${candidateIndex + 1}`, summary: venues.map((venue) => venue.name).join("、"),
-          matchScore: Math.min(100, 60 + sharedHits * 12 + interestHits * 5),
+          matchScore: Math.round(60 + 40 * coverage.support / (participantCount * venues.length)),
           reasons: [
             interestCoverageReason(normalizedPreferences.participants, venues),
             "已核对地点、时间、路线和预算",
