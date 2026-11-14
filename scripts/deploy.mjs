@@ -112,10 +112,15 @@ export async function deployRelease({ root, release, pm2 = runPm2, fetch: fetche
   };
   try {
     const upload = join(deployment, "uploads", release);
-    for (const path of ["dist/index.html", "dist-server/server.mjs", "tests/fixtures/plan-request.demo.json"]) {
+    for (const path of ["dist/index.html", "dist-server/server.mjs", "tests/fixtures/plan-request.demo.json", "scripts/backup-groups.mjs"]) {
       await access(join(upload, path));
     }
     const previous = snapshot(pm2, root);
+    // Prepare the snapshot before promotion: a CLI loaded from uploads keeps its
+    // original import.meta.url even after that directory is renamed. Preparation
+    // failures must leave the healthy old process running without a restart.
+    const exists = await access(previous.env.GROUP_DB_PATH).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
+    if (exists) execFileSync(process.execPath, ['--experimental-sqlite', join(upload, 'scripts', 'backup-groups.mjs'), previous.env.GROUP_DB_PATH], { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 });
     const directory = join(deployment, "releases", release);
     await mkdir(join(deployment, "releases"), { recursive: true });
     await rename(upload, directory);
@@ -126,9 +131,6 @@ export async function deployRelease({ root, release, pm2 = runPm2, fetch: fetche
       env: { ...previous.env, APP_RELEASE: release, STATIC_ROOT: join(directory, "dist") },
     };
     try {
-      // A consistent live snapshot precedes startup/migration of the new bundle.
-      const exists = await access(previous.env.GROUP_DB_PATH).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error; });
-      if (exists) execFileSync(process.execPath, ['--experimental-sqlite', fileURLToPath(new URL('./backup-groups.mjs', import.meta.url)), previous.env.GROUP_DB_PATH], { stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 });
       await activate(next);
       await waitForService(fetcher, pause, release);
       await smokeTest(fetcher, directory);

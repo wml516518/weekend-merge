@@ -2,9 +2,22 @@
 No fetch mocks, no model/weather credentials, no capability values printed or captured.
 """
 import json
+import re
+import sys
+import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+
+def redact_capabilities(value):
+    return re.sub(r'((?:#|%23)(?:invite|recover)(?:=|%3d))[^\s\'"<>]+', r'\1[REDACTED]', str(value), flags=re.IGNORECASE)
+
+def report_failure(kind, value, tb):
+    # Playwright's navigation call log and chained exceptions include full URLs.
+    # Format once, then redact the entire traceback before writing any of it.
+    sys.stderr.write(redact_capabilities(''.join(traceback.format_exception(kind, value, tb))))
+
+sys.excepthook = report_failure
 
 BASE = 'http://127.0.0.1:8791'
 OUT = Path('output/playwright')
@@ -27,7 +40,7 @@ with sync_playwright() as p:
         return ctx
     def page_for(ctx, url=BASE):
         page = ctx.new_page()
-        page.on('pageerror', lambda error: failures.append(str(error)))
+        page.on('pageerror', lambda error: failures.append(redact_capabilities(error)))
         page.goto(url, wait_until='domcontentloaded')
         page.wait_for_load_state('networkidle')
         return page
@@ -49,7 +62,7 @@ with sync_playwright() as p:
         try:
             expect(page.get_by_label('邀请链接', exact=True)).to_be_visible()
         except AssertionError:
-            print('Create failure alerts:', page.get_by_role('alert').all_text_contents(), flush=True)
+            print('Create failure alerts:', redact_capabilities(page.get_by_role('alert').all_text_contents()), flush=True)
             raise
         invite = page.get_by_label('邀请链接', exact=True).input_value()
         personal = page.get_by_label('我的恢复链接', exact=True).input_value()

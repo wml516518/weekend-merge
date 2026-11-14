@@ -46,6 +46,8 @@ node scripts/setup-deploy.mjs 'ssh-ed25519 替换成专用公钥 github-actions-
 
 CI 固定 Node22.11.0，`npm ci` → `npm run test:node22`（fork 启动显式 SQLite flag）→ `npm run build` → 隔离 PM2 干跑。产物包含 dist、dist-server、deploy/backup 脚本及演示 fixture，不包含数据库。main 发布串行执行，旧 workflow 重跑不会覆盖更新的 main。SSH 核对主机，上传后调用 `.deploy/run-node <upload>/scripts/deploy.mjs <root> <release>`。
 
+Node22.11 测试输出允许唯一已知平台提示：`ExperimentalWarning: SQLite is an experimental feature and might change at any time`（及其 trace-warnings 提示行）。这是 SQLite 平台状态，测试不使用 `--no-warnings` 或全局警告屏蔽；其他警告仍应检查，不称含该提示的输出为无警告。
+
 发布在首次启动新 bundle 前用 VACUUM INTO 做一致性备份，包含已提交的 WAL 页；备份失败则不激活新版本。随后切换单进程，检查版本 `/healthz`、首页和显式 demo 三候选结果，成功才 PM2 save。检查使用 demo，不调用付费模型。失败恢复旧进程并报告失败；旧 release 和备份保留供人工检查。
 
 ## 在线备份与离线恢复

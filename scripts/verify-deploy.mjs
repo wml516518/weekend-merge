@@ -1,14 +1,14 @@
 // Runs real PM2 in a disposable PM2_HOME. Never uses the user's PM2 daemon.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deployRelease } from "./deploy.mjs";
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const sandbox = await mkdtemp(join(tmpdir(), "weekend-pm2-verify-"));
+// Canonicalize macOS /var -> /private/var so Node's direct-module CLI guard matches.
+const sandbox = await realpath(await mkdtemp(join(tmpdir(), "weekend-pm2-verify-")));
 const root = join(sandbox, "app");
 process.env.PM2_HOME = join(sandbox, "pm2");
 process.env.HOST = "127.0.0.1";
@@ -32,6 +32,13 @@ async function artifact(directory) {
   await cp(join(project, "dist-server"), join(directory, "dist-server"), { recursive: true });
   await mkdir(join(directory, "tests", "fixtures"), { recursive: true });
   await cp(join(project, "tests", "fixtures", "plan-request.demo.json"), join(directory, "tests", "fixtures", "plan-request.demo.json"));
+  await mkdir(join(directory, 'scripts'), { recursive: true });
+  for (const script of ['deploy.mjs', 'backup-groups.mjs']) await cp(join(project, 'scripts', script), join(directory, 'scripts', script));
+}
+
+// Exercise the exact workflow entry point, including upload-directory promotion.
+function deployPackaged(release) {
+  return execFileSync(process.execPath, [join(root, '.deploy', 'uploads', release, 'scripts', 'deploy.mjs'), root, release], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 300_000 });
 }
 
 async function health() {
@@ -57,10 +64,20 @@ try {
     const response = await fetch(`http://127.0.0.1:8787/api/groups/${created.group.id}`, { headers: { Cookie: cookie } });
     assert.equal(response.status, 200); assert.equal((await response.json()).name, 'Persistence proof');
   };
+  const backupFailure = `${'d'.repeat(40)}-99-1`;
+  const rejectedUpload = join(root, '.deploy', 'uploads', backupFailure);
+  await artifact(rejectedUpload);
+  await writeFile(join(rejectedUpload, 'scripts', 'backup-groups.mjs'), 'process.exit(7);');
+  const oldPid = JSON.parse(pm2(['jlist'])).find(p => p.name === 'weekend-merge').pid;
+  assert.throws(() => deployPackaged(backupFailure), error => error.status === 1);
+  assert.equal(JSON.parse(pm2(['jlist'])).find(p => p.name === 'weekend-merge').pid, oldPid);
+  assert.equal((await health()).release, 'local'); await persisted();
+  assert.ok((await readdir(join(root, '.deploy', 'uploads'))).includes(backupFailure));
+  console.log('PASS: packaged backup failure left the healthy old process/PID and group unchanged');
   const release = `${"b".repeat(40)}-100-1`;
   const directory = join(root, ".deploy", "releases", release);
   await artifact(join(root, ".deploy", "uploads", release));
-  await deployRelease({ root, release });
+  deployPackaged(release);
   assert.equal((await health()).release, release);
   const active = JSON.parse(pm2(["jlist"])).find(p => p.name === "weekend-merge");
   // A version env var alone could mask PM2 still executing an older bundle.
@@ -83,7 +100,7 @@ try {
   const brokenDirectory = join(root, ".deploy", "uploads", broken);
   await artifact(brokenDirectory);
   await writeFile(join(brokenDirectory, "dist-server", "server.mjs"), "process.exit(1);");
-  await assert.rejects(deployRelease({ root, release: broken }), /rolled back/);
+  assert.throws(() => deployPackaged(broken), error => error.status === 1 && error.stderr.includes('rolled back'));
   assert.equal((await health()).release, release);
   const restored = JSON.parse(pm2(["jlist"])).find(p => p.name === "weekend-merge");
   assert.equal(restored.pm2_env.pm_exec_path, join(directory, "dist-server", "server.mjs"));

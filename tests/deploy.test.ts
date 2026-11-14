@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, realpath, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -10,7 +10,7 @@ const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "weekend-deploy-test-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "weekend-deploy-test-")));
   roots.push(root);
   const release = `${"a".repeat(40)}-123-1`;
   const upload = join(root, ".deploy", "uploads", release);
@@ -20,6 +20,8 @@ async function fixture() {
   await writeFile(join(upload, "dist", "index.html"), "<!doctype html>");
   await writeFile(join(upload, "dist-server", "server.mjs"), "// bundled server");
   await writeFile(join(upload, "tests", "fixtures", "plan-request.demo.json"), JSON.stringify({ setup: {} }));
+  await mkdir(join(upload, 'scripts'));
+  await cp('scripts/backup-groups.mjs', join(upload, 'scripts', 'backup-groups.mjs'));
   await writeFile(join(root, ".env"), "server-only-secret");
   let active: Record<string, any> | undefined = {
     name: "weekend-merge", script: join(root, "dist-server", "server.mjs"), cwd: root,
@@ -48,6 +50,22 @@ async function fixture() {
 import { readFileSync as requireRead } from "node:fs";
 
 describe("server artifact deployment", () => {
+  it('validates that the artifact includes its backup helper before accessing PM2', async () => {
+    const f = await fixture();
+    await rm(join(f.root, '.deploy', 'uploads', f.release, 'scripts', 'backup-groups.mjs'));
+    await expect(deployRelease({ ...f })).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(f.operations).toEqual([]);
+    expect(f.active().script).toBe(join(f.root, 'dist-server', 'server.mjs'));
+  });
+  it('leaves the healthy old service untouched when an existing database cannot be backed up', async () => {
+    const f = await fixture();
+    await mkdir(join(f.root, 'data-runtime'));
+    await writeFile(join(f.root, 'data-runtime', 'groups.sqlite'), 'invalid SQLite backup input');
+    await expect(deployRelease({ ...f, fetch: async () => new Response('ok'), pause: async () => {} })).rejects.toThrow();
+    expect(f.active().script).toBe(join(f.root, 'dist-server', 'server.mjs'));
+    expect(f.operations).toEqual(['jlist']);
+    await expect(readFile(join(f.root, '.deploy', 'current.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
   it('refuses to stop an existing group server without its configured drain grace', async () => {
     const f = await fixture(); f.active().env.GROUP_DB_PATH = join(f.root, 'data-runtime', 'groups.sqlite');
     await expect(deployRelease({ ...f, fetch: async () => new Response('ok') })).rejects.toThrow(/kill_timeout/);
