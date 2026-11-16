@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { ArrowRight, CalendarDays, ShieldCheck, UsersRound } from "lucide-react";
 import {
   PlanSetupSchema,
   ShanghaiAreaSchema,
@@ -24,14 +25,22 @@ export function GroupCreate({
 }) {
   const [targetCount, setCount] = useState(initial?.targetCount ?? 2);
   const [setup, setSetup] = useState<PlanSetup>(
-    initial?.setup ?? {
-      city: "上海",
-      date: nextWeekend(),
-      startTime: "13:00",
-      endTime: "20:00",
-      budget: 300,
-      startingArea: "徐汇",
-    },
+    initial
+      ? {
+          ...initial.setup,
+          date:
+            initial.setup.date < shanghaiToday()
+              ? nextWeekend()
+              : initial.setup.date,
+        }
+      : {
+          city: "上海",
+          date: nextWeekend(),
+          startTime: "13:00",
+          endTime: "20:00",
+          budget: 300,
+          startingArea: "徐汇",
+        },
   );
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -55,7 +64,18 @@ export function GroupCreate({
   }
   return (
     <form className="group-create" onSubmit={submit}>
-      <h2>{initial ? "开启新一轮收集" : "约好共同的时间"}</h2>
+      <div className="group-create-heading">
+        <span className="group-kicker">
+          {initial ? <CalendarDays size={14} /> : <UsersRound size={14} />}
+          {initial ? "重新确认共同条件" : "01 · 先定下共同条件"}
+        </span>
+        <h2>{initial ? "开启新一轮收集" : "约好共同的时间"}</h2>
+        <p>
+          {initial
+            ? "新一轮会保留成员席位与个人草稿，但需要每个人重新确认。"
+            : "创建后把邀请发给同行的人，每个人只填写自己的期待。"}
+        </p>
+      </div>
       {!initial && (
         <>
           <label>
@@ -63,6 +83,7 @@ export function GroupCreate({
             <input
               required
               maxLength={40}
+              placeholder="例如：梧桐区慢游"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -72,6 +93,7 @@ export function GroupCreate({
             <input
               required
               maxLength={40}
+              placeholder="怎么称呼你"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
             />
@@ -177,7 +199,14 @@ export function GroupCreate({
       {error && <p role="alert">{error}</p>}
       <button className="button primary" disabled={busy} type="submit">
         {initial ? "确认开启新一轮" : "创建并邀请"}
+        <ArrowRight size={16} aria-hidden="true" />
       </button>
+      {!initial && (
+        <p className="group-privacy-note">
+          <ShieldCheck size={15} aria-hidden="true" />
+          原始偏好仅本人可查看，计划创建后 30 天自动过期。
+        </p>
+      )}
     </form>
   );
 }

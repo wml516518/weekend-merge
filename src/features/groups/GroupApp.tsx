@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Leaf } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  Compass,
+  Leaf,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+} from "lucide-react";
 import type { GroupView } from "@/contracts/groups";
 import { GroupCreate } from "./GroupCreate";
 import { GroupLobby } from "./GroupLobby";
@@ -20,6 +30,14 @@ type IssuedLinks = {
   inviteRevision?: number;
   personal?: Record<string, string>;
   owner?: string;
+};
+const groupStateLabels: Record<GroupView["state"], string> = {
+  collecting: "收集期待中",
+  queued: "等待规划",
+  running: "Agent 规划中",
+  ready: "方案已就绪",
+  failed: "需要重试",
+  finalized: "行程已确认",
 };
 export function GroupApp() {
   const [entry, setEntry] = useState(readEntry);
@@ -344,7 +362,7 @@ export function GroupApp() {
             onFocus={(e) => e.currentTarget.select()}
           />
         </label>
-        <button className="text-button" onClick={() => copy(value)}>
+        <button className="button secondary group-copy-button" onClick={() => copy(value)}>
           复制{label}
         </button>
       </div>
@@ -366,14 +384,22 @@ export function GroupApp() {
             <small>周末共识局</small>
           </span>
         </button>
-        <nav aria-label="应用导航" className="group-actions">
-          <button className="text-button" onClick={home}>
+        <nav aria-label="应用导航" className="top-nav group-nav">
+          <button className="nav-active" onClick={home}>
             我的计划
           </button>
-          <a className="text-button" href="#demo">
+          <a className="group-demo-link" href="#demo">
             体验演示
           </a>
         </nav>
+        <div className="group-header-meta">
+          <span className="demo-pill">
+            <span /> 多人实时计划
+          </span>
+          <span className="group-header-avatar" aria-hidden="true">
+            <UsersRound size={17} />
+          </span>
+        </div>
       </header>
       <div className="group-content">
         {(error || pollError) && (
@@ -396,7 +422,12 @@ export function GroupApp() {
             )}
           </div>
         )}
-        {message && <p role="status">{message}</p>}
+        {message && (
+          <p className="group-toast" role="status">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            {message}
+          </p>
+        )}
         {joinToken && (
           <form
             className="group-join"
@@ -425,6 +456,9 @@ export function GroupApp() {
               });
             }}
           >
+            <span className="group-kicker">
+              <UsersRound size={14} /> 受邀加入
+            </span>
             <h1>{handoff ? "交给同设备另一位" : "一起留个周末"}</h1>
             <p>
               {handoff
@@ -442,6 +476,7 @@ export function GroupApp() {
             </label>
             <button className="button primary" disabled={busy || loading}>
               {handoff ? "确认新增独立成员" : "加入计划"}
+              <ArrowRight size={16} aria-hidden="true" />
             </button>
             {handoff && (
               <button
@@ -483,7 +518,15 @@ export function GroupApp() {
             />
             {(links.invite || links.personal?.[memberId] || links.owner) && (
               <section className="group-links" aria-label="邀请与恢复链接">
-                <h2>把邀请发给同行的人</h2>
+                <div className="group-links-heading">
+                  <span className="group-icon-box">
+                    <LockKeyhole size={19} />
+                  </span>
+                  <div>
+                    <small>邀请与恢复</small>
+                    <h2>把邀请发给同行的人</h2>
+                  </div>
+                </div>
                 {linkField(
                   "邀请链接",
                   "invite",
@@ -495,8 +538,11 @@ export function GroupApp() {
                   links.personal?.[memberId],
                 )}
                 {linkField("管理恢复链接", "recover", links.owner)}
-                <p>
+                <p className="group-security-note">
+                  <ShieldCheck size={17} aria-hidden="true" />
+                  <span>
                   请现在妥善保存恢复链接，刷新后不会再次显示。个人链接可恢复本人的答案；管理链接可操作整个计划，请勿发到群聊。链接不写入本地存储。
+                  </span>
                 </p>
               </section>
             )}
@@ -505,7 +551,9 @@ export function GroupApp() {
         {!activeId && !joinToken && entry?.kind !== "recover" && (
           <main className="group-home">
             <section className="group-home-intro">
-              <small>上海 · 2–6 人的周末</small>
+              <span className="group-kicker">
+                <Sparkles size={14} /> 上海 · 2–6 人的周末
+              </span>
               <h1>
                 先各自期待，
                 <br />
@@ -516,22 +564,38 @@ export function GroupApp() {
                 <br />
                 每一份期待到齐后，一起从三个提案里做选择。
               </p>
+              <div className="group-value-list" aria-label="产品特点">
+                <span><UsersRound size={15} /> 独立填写</span>
+                <span><Compass size={15} /> 三套提案</span>
+                <span><ShieldCheck size={15} /> 只展示共识</span>
+              </div>
               <section className="group-list" aria-label="我的计划">
-                <h2>我的计划</h2>
+                <div className="group-list-heading">
+                  <div>
+                    <small>继续上次的约定</small>
+                    <h2>我的计划</h2>
+                  </div>
+                  <CalendarDays size={19} aria-hidden="true" />
+                </div>
                 {loading ? (
                   <p>正在读取计划…</p>
                 ) : groups.length ? (
                   groups.map((g) => (
-                    <div key={g.id}>
-                      <h3>{g.name}</h3>
-                      <p>
-                        {g.targetCount} 人 · 第 {g.revision} 轮 ·{" "}
-                        {g.members.filter((m) => m.submitted).length} 人已提交
-                      </p>
+                    <article className="group-list-card" key={g.id}>
+                      <div>
+                        <span className={`group-state group-state-${g.state}`}>
+                          {groupStateLabels[g.state]}
+                        </span>
+                        <h3>{g.name}</h3>
+                        <p>
+                          {g.targetCount} 人 · 第 {g.revision} 轮 ·{" "}
+                          {g.members.filter((m) => m.submitted).length} 人已提交
+                        </p>
+                      </div>
                       <button className="text-button" onClick={() => open(g)}>
-                        打开 {g.name}
+                        打开 {g.name} <ArrowRight size={14} aria-hidden="true" />
                       </button>
-                    </div>
+                    </article>
                   ))
                 ) : (
                   <p>此设备还没有参与的计划。创建一个，或打开朋友的邀请。</p>

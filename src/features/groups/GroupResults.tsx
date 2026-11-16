@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  Check,
+  Clock3,
+  Footprints,
+  LockKeyhole,
+  Sparkles,
+  UsersRound,
+  WalletCards,
+  WandSparkles,
+} from "lucide-react";
 import type { AgentEvent } from "@/contracts/agent";
 import type { GroupView } from "@/contracts/groups";
 import { RouteMap } from "@/components/RouteMap";
@@ -63,27 +73,34 @@ export function GroupResults({
         : undefined;
   const editable = group.canManage && group.state === "ready" && !busy;
   const catalogDisclosure = (
-    <p>
+    <p className="group-catalog-note">
       地点来自静态上海精选目录，营业时间与票价须出发前核实；路线、步行距离和费用为估算，非实时导航。
     </p>
   );
   const events = group.job && (
     <section className="group-events" aria-label="持久规划事件">
-      <h2>一起等一个好周末</h2>
-      <p>
-        第 {group.job.attempt} 次尝试 ·{" "}
-        {group.job.kind === "replan" ? "局部调整" : "完整规划"}
-      </p>
+      <div className="group-section-heading">
+        <div>
+          <span className="group-kicker"><WandSparkles size={14} /> Agent 轨迹</span>
+          <h2>一起等一个好周末</h2>
+        </div>
+        <span className="group-attempt">
+          第 {group.job.attempt} 次 · {group.job.kind === "replan" ? "局部调整" : "完整规划"}
+        </span>
+      </div>
       <ol>
         {group.job.events.map(({ sequence, event }) => (
           <li key={sequence}>
-            {eventText(event)}
-            {event.type === "tool.completed" && (
-              <details>
-                <summary>查看工具依据</summary>
-                <pre>{JSON.stringify(event.summary, null, 2)}</pre>
-              </details>
-            )}
+            <span className="group-event-dot"><Check size={12} /></span>
+            <div>
+              <p>{eventText(event)}</p>
+              {event.type === "tool.completed" && (
+                <details>
+                  <summary>查看工具依据</summary>
+                  <pre>{JSON.stringify(event.summary, null, 2)}</pre>
+                </details>
+              )}
+            </div>
           </li>
         ))}
       </ol>
@@ -132,34 +149,44 @@ export function GroupResults({
       )}
       {summary && (
         <section className="group-consensus">
+          <span className="group-kicker"><Sparkles size={14} /> 共识摘要</span>
           <h2>大家的兴趣支持</h2>
           <p>依据本轮已提交的偏好生成；成员兴趣覆盖见各方案说明。</p>
-          {summary.interestSupport?.length ? (
-            summary.interestSupport.map(({ interest, count, total }) => (
-              <p key={interest}>{interest} · {count}/{total} 人支持</p>
-            ))
-          ) : summary.shared.length ? (
-            summary.shared.map((s) => (
-              <p key={s}>
-                {s} · {group.members.length}/{group.members.length} 人共同支持
-              </p>
-            ))
-          ) : (
-            <p>没有全员共同兴趣，将分别照顾大家的期待。</p>
+          <div className="group-consensus-chips">
+            {summary.interestSupport?.length ? (
+              summary.interestSupport.map(({ interest, count, total }) => (
+                <p key={interest}>{interest} · {count}/{total} 人支持</p>
+              ))
+            ) : summary.shared.length ? (
+              summary.shared.map((s) => (
+                <p key={s}>
+                  {s} · {group.members.length}/{group.members.length} 人共同支持
+                </p>
+              ))
+            ) : (
+              <p>没有全员共同兴趣，将分别照顾大家的期待。</p>
+            )}
+          </div>
+          {(summary.conflicts.length > 0 || summary.constraints.length > 0) && (
+            <div className="group-consensus-notes">
+              {summary.conflicts.map((s) => (
+                <p key={s}>需要照顾：{s}</p>
+              ))}
+              {summary.constraints.map((s) => (
+                <p key={s}>共同条件：{s}</p>
+              ))}
+            </div>
           )}
-          {summary.conflicts.map((s) => (
-            <p key={s}>需要照顾：{s}</p>
-          ))}
-          {summary.constraints.map((s) => (
-            <p key={s}>共同条件：{s}</p>
-          ))}
         </section>
       )}
       {group.candidates.length > 0 && (
         <>
           <div className="group-section-heading">
-            <h2>三个周末提案</h2>
-            <span>已调整 {group.replanCount} / 2 次</span>
+            <div>
+              <span className="group-kicker"><Sparkles size={14} /> 候选方案</span>
+              <h2>三个周末提案</h2>
+            </div>
+            <span className="group-attempt">已调整 {group.replanCount} / 2 次</span>
           </div>
           {catalogDisclosure}
           <div className="group-candidates">
@@ -174,14 +201,12 @@ export function GroupResults({
                 </small>
                 <h3>{plan.title}</h3>
                 <p>{plan.summary}</p>
-                <p>
-                  {group.members.length} 人总计 ¥{plan.totalCost} · 人均 ¥
-                  {Math.round((plan.totalCost / group.members.length) * 100) /
-                    100}
-                </p>
-                <p>
-                  预计 {plan.totalDistanceKm} km · 室内 {plan.indoorRatio}%
-                </p>
+                <div className="group-plan-metrics">
+                  <span><WalletCards size={15} />{group.members.length} 人 ¥{plan.totalCost}</span>
+                  <span><Footprints size={15} />预计 {plan.totalDistanceKm} km</span>
+                  <span><UsersRound size={15} />人均 ¥{Math.round((plan.totalCost / group.members.length) * 100) / 100}</span>
+                  <span><Clock3 size={15} />室内 {plan.indoorRatio}%</span>
+                </div>
                 <ul>
                   {plan.reasons.map((r) => (
                     <li key={r}>{r}</li>
@@ -211,11 +236,18 @@ export function GroupResults({
       )}
       {selected && (
         <section className="group-selected">
-          <h2>已选择：{selected.title}</h2>
+          <div className="group-selected-heading">
+            <span className="group-icon-box"><Check size={19} /></span>
+            <div>
+              <small>当前共同选择</small>
+              <h2>已选择：{selected.title}</h2>
+            </div>
+          </div>
           <div className="group-itinerary">
             <div>
               {selected.stops.map((stop) => (
                 <article className="group-stop" key={stop.id}>
+                  <span className="group-stop-dot" aria-hidden="true" />
                   <small>
                     {stop.startTime}–{stop.endTime} · {stop.area}
                   </small>
@@ -224,7 +256,9 @@ export function GroupResults({
                     {group.members.length} 人 ¥{stop.cost} ·{" "}
                     {stop.tags.join(" / ")}
                   </p>
-                  {group.lockedStopIds.includes(stop.id) && <p>已锁定</p>}
+                  {group.lockedStopIds.includes(stop.id) && (
+                    <span className="group-locked-tag"><LockKeyhole size={13} />已锁定</span>
+                  )}
                   {group.canManage && (
                     <div className="group-actions">
                       <button

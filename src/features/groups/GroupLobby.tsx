@@ -1,4 +1,14 @@
 import { useState } from "react";
+import {
+  CalendarDays,
+  Check,
+  Clock3,
+  MapPin,
+  ShieldCheck,
+  UserRound,
+  UsersRound,
+  WalletCards,
+} from "lucide-react";
 import type { PersonPreferences } from "@/contracts/agent";
 import type { GroupView } from "@/contracts/groups";
 import { dateLabel } from "@/components/Ui";
@@ -14,6 +24,14 @@ const states = {
   ready: "三个方案已就绪",
   failed: "规划需要重试",
   finalized: "最终行程已确认",
+};
+const stateBadges = {
+  collecting: "收集中",
+  queued: "排队中",
+  running: "规划中",
+  ready: "已就绪",
+  failed: "需重试",
+  finalized: "已确认",
 };
 export function GroupLobby({
   group,
@@ -97,21 +115,36 @@ export function GroupLobby({
     <>
       <div className="group-lobby">
         <section className="group-common">
-          <small>上海 · 第 {group.revision} 轮</small>
+          <span className={`group-state group-state-${group.state}`}>
+            {stateBadges[group.state]}
+          </span>
+          <small className="group-round-label">上海 · 第 {group.revision} 轮</small>
           <h1>{group.name}</h1>
-          <p>
-            {dateLabel(group.setup.date)}
-            <br />
-            {group.setup.startTime}–{group.setup.endTime} ·{" "}
-            {group.setup.startingArea}
-          </p>
-          <p>
-            {group.targetCount} 人总预算 ¥{group.setup.budget}
-            <br />
-            人均 ¥
-            {Math.round((group.setup.budget / group.targetCount) * 100) / 100}
-          </p>
-          <p className="group-muted">
+          <div className="group-facts">
+            <div>
+              <CalendarDays size={17} />
+              <span><small>日期</small>{dateLabel(group.setup.date)}</span>
+            </div>
+            <div>
+              <Clock3 size={17} />
+              <span><small>时间</small>{group.setup.startTime}–{group.setup.endTime}</span>
+            </div>
+            <div>
+              <MapPin size={17} />
+              <span><small>出发区域</small>{group.setup.startingArea}</span>
+            </div>
+            <div>
+              <WalletCards size={17} />
+              <span>
+                <small>{group.targetCount} 人总预算</small>
+                ¥{group.setup.budget} · 人均 ¥
+                {Math.round((group.setup.budget / group.targetCount) * 100) / 100}
+              </span>
+            </div>
+          </div>
+          <p className="group-lifecycle group-muted">
+            <ShieldCheck size={15} aria-hidden="true" />
+            <span>
             计划有效至 {new Date(group.expiresAt).toLocaleString("zh-CN")}
             <br />
             {group.state !== "collecting"
@@ -123,6 +156,7 @@ export function GroupLobby({
                   : Date.now() >= group.inviteExpiresAt
                     ? "本轮邀请已失效，请更新邀请链接。"
                     : `邀请有效至 ${new Date(group.inviteExpiresAt).toLocaleString("zh-CN")}`}
+            </span>
           </p>
           {group.state !== "collecting" && (
             <p className="group-muted">
@@ -151,11 +185,20 @@ export function GroupLobby({
           </div>
         </section>
         <section className="group-members">
-          <h2>留好每个人的位置</h2>
-          <p role="status">
+          <div className="group-members-heading">
+            <div>
+              <span className="group-kicker"><UsersRound size={14} /> 成员进度</span>
+              <h2>留好每个人的位置</h2>
+            </div>
+            <strong>{submitted}/{group.targetCount}</strong>
+          </div>
+          <p className="group-progress-copy" role="status">
             {expired ? "计划已过期，请创建新计划。" : states[group.state]} ·
             已提交 {submitted} / {group.targetCount}
           </p>
+          <div className="group-progress" aria-hidden="true">
+            <span style={{ width: `${(submitted / group.targetCount) * 100}%` }} />
+          </div>
           <ul
             className="group-seats"
             aria-label="参与席位"
@@ -176,10 +219,16 @@ export function GroupLobby({
                   }
                 >
                   <span className="group-seat-avatar">
-                    {member ? member.nickname.slice(0, 1) : "+"}
+                    {member?.submitted ? (
+                      <Check size={18} aria-hidden="true" />
+                    ) : member ? (
+                      member.nickname.slice(0, 1)
+                    ) : (
+                      "+"
+                    )}
                   </span>
                   <strong>{member?.nickname ?? "等待加入"}</strong>
-                  <span>
+                  <span className="group-seat-state">
                     {member
                       ? member.submitted
                         ? "已提交 ✓"
@@ -222,10 +271,13 @@ export function GroupLobby({
           <div className="group-own-action">
             {mine ? (
               <>
-                <p>
-                  当前身份：{mine.nickname} ·{" "}
-                  {mine.submitted ? "已提交" : "尚未提交"}
-                </p>
+                <div className="group-identity-copy">
+                  <span className="group-icon-box"><UserRound size={18} /></span>
+                  <p>
+                    <small>当前身份：{mine.nickname}</small>
+                    <strong>{mine.submitted ? "偏好已提交" : "等待填写偏好"}</strong>
+                  </p>
+                </div>
                 {canEdit && (
                   <button
                     className="button primary"
