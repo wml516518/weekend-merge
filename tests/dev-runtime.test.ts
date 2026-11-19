@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer } from 'node:net';
 import { expect, it } from 'vitest';
+import { siteAuthorization } from '../scripts/site-access.mjs';
 
 it('serves the group API from the documented npm run dev entry without NODE_OPTIONS', async () => {
   const root = mkdtempSync(join(tmpdir(), 'group-dev-'));
@@ -30,6 +31,8 @@ it('serves the group API from the documented npm run dev entry without NODE_OPTI
       await new Promise(done => setTimeout(done, 40));
     }
     expect(response, output).toBeDefined();
+    expect(response!.status).toBe(401);
+    response = await fetch(`${origin}/api/groups`, { headers: { authorization: siteAuthorization(env) } });
     expect(response!.status, output).toBe(200);
     expect(await response!.json()).toEqual({ groups: [] });
     expect(response!.headers.get('set-cookie')).toContain('weekend_group_dev=');

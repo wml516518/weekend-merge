@@ -5,6 +5,17 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { loadEnv, type Plugin } from "vite";
 import type { createGroupRuntime } from "../server/groups/runtime";
+import { loginChallenge } from './site-access.mjs';
+import type { PreviewServer, ViteDevServer } from 'vite';
+
+function installLogin(server: ViteDevServer | PreviewServer) {
+  const env = { ...process.env, ...loadEnv(server.config.mode, server.config.envDir, 'WEEKEND_AUTH_') };
+  server.middlewares.use((incoming, outgoing, next) => {
+    const denied = loginChallenge(incoming.headers.authorization, env);
+    if (!denied) return next();
+    void sendResponse(denied, outgoing).catch(() => outgoing.destroy());
+  });
+}
 
 function toRequest(request: IncomingMessage, url: URL) {
   const method = request.method ?? "GET";
@@ -37,7 +48,9 @@ export function localFunctions(): Plugin {
   return {
     name: "weekend-merge-local-functions",
     apply: "serve",
+    configurePreviewServer: installLogin,
     configureServer(server) {
+      installLogin(server);
       const { mode, envDir } = server.config;
       const env = { ...process.env, ...loadEnv(mode, envDir, ["DEEPSEEK_", "QWEATHER_", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) };
       let runtime: Promise<ReturnType<typeof createGroupRuntime>> | undefined;

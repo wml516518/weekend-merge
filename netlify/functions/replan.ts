@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { loginChallenge } from '../../scripts/site-access.mjs';
 import { getParticipants, ItinerarySchema, ReplanRequestSchema, type AgentEvent, type Itinerary, type ReplanRequest } from "../../src/contracts/agent";
 import { analyzeConsensus } from "./agent/fallbacks/consensus";
 import { acceptsFeedback, feedbackDescriptions, parseReplanFeedback, type ReplanFeedback } from "./agent/replanFeedback";
@@ -188,4 +189,5 @@ export function createReplanHandler(dependencies: { now?: () => Date } = {}) {
     }
   };
 }
-export default createReplanHandler();
+const handleReplan = createReplanHandler();
+export default (request: Request) => loginChallenge(request.headers.get('authorization'), process.env) ?? handleReplan(request);

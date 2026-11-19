@@ -6,13 +6,14 @@ import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import fixture from './fixtures/plan-request.demo.json';
+import { siteAuthorization } from '../scripts/site-access.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'bundled-runtime-'));
 let child: ChildProcess | undefined; let port: number; let output = '';
 const origin = 'https://weekendmerge.ailoong.net.cn';
 const jars = new Map<string, string>();
 async function request(session: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
-  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: jars.get(session) ?? '', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { authorization: siteAuthorization(process.env), Origin: origin, 'Content-Type': 'application/json', Cookie: jars.get(session) ?? '', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   const cookie = response.headers.get('set-cookie'); if (cookie) jars.set(session, cookie.split(';')[0]);
   return response;
 }
@@ -38,6 +39,17 @@ beforeAll(async () => {
   await start();
 });
 afterAll(async () => { await stop(); rmSync(root, { recursive: true, force: true }); });
+it('challenges anonymous page and API requests before issuing a group cookie', async () => {
+  for (const path of ['/', '/api/groups', '/.netlify/functions/plan']) {
+    for (const authorization of ['', 'Basic d3Jvbmc6d3Jvbmc=']) {
+      const response = await request('visitor', path, undefined, { authorization });
+      expect(response.status).toBe(401);
+      expect(response.headers.get('www-authenticate')).toContain('Basic realm=');
+      expect(response.headers.has('set-cookie')).toBe(false);
+    }
+  }
+  expect((await request('visitor', '/')).status).toBe(200);
+});
 it('enforces production cookie, origin, API routing and static database/backup isolation', async () => {
   const list = await request('policy', '/api/groups');
   expect(list.status).toBe(200); expect(list.headers.get('set-cookie')).toContain('__Host-weekend_group=');
