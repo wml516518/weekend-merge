@@ -5,6 +5,7 @@ import { cp, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { siteAuthorization } from './site-access.mjs';
 
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // Canonicalize macOS /var -> /private/var so Node's direct-module CLI guard matches.
@@ -20,6 +21,8 @@ process.env.PUBLIC_ORIGIN = 'https://weekendmerge.ailoong.net.cn';
 process.env.GROUP_DB_PATH = join(root, 'data-runtime', 'groups.sqlite');
 process.env.GROUP_JOB_CONCURRENCY = '2';
 process.env.NODE_ENV = 'production';
+process.env.WEEKEND_AUTH_PASSWORD = 'deployment-test-password';
+const authorization = siteAuthorization(process.env);
 delete process.env.APP_RELEASE;
 delete process.env.STATIC_ROOT;
 const pm2 = args => execFileSync("pm2", args, {
@@ -33,7 +36,7 @@ async function artifact(directory) {
   await mkdir(join(directory, "tests", "fixtures"), { recursive: true });
   await cp(join(project, "tests", "fixtures", "plan-request.demo.json"), join(directory, "tests", "fixtures", "plan-request.demo.json"));
   await mkdir(join(directory, 'scripts'), { recursive: true });
-  for (const script of ['deploy.mjs', 'backup-groups.mjs']) await cp(join(project, 'scripts', script), join(directory, 'scripts', script));
+  for (const script of ['deploy.mjs', 'backup-groups.mjs', 'site-access.mjs']) await cp(join(project, 'scripts', script), join(directory, 'scripts', script));
 }
 
 // Exercise the exact workflow entry point, including upload-directory promotion.
@@ -57,11 +60,11 @@ try {
   pm2(["start", join(root, "dist-server", "server.mjs"), "--name", "weekend-merge", "--cwd", root, "--interpreter", process.execPath, '--node-args=--experimental-sqlite', '--kill-timeout', '240000']);
   assert.equal((await health()).release, "local");
   const date = new Date(Date.now() + 8 * 3600_000); date.setUTCDate(date.getUTCDate() + ((6 - date.getUTCDay() + 7) % 7 || 7));
-  const createdResponse = await fetch('http://127.0.0.1:8787/api/groups', { method: 'POST', headers: { Origin: process.env.PUBLIC_ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Persistence proof', nickname: 'Owner', targetCount: 2, setup: { city: '上海', date: date.toISOString().slice(0, 10), startTime: '13:00', endTime: '20:00', budget: 300, startingArea: '徐汇滨江' } }) });
+  const createdResponse = await fetch('http://127.0.0.1:8787/api/groups', { method: 'POST', headers: { authorization, Origin: process.env.PUBLIC_ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Persistence proof', nickname: 'Owner', targetCount: 2, setup: { city: '上海', date: date.toISOString().slice(0, 10), startTime: '13:00', endTime: '20:00', budget: 300, startingArea: '徐汇滨江' } }) });
   assert.equal(createdResponse.status, 201);
   const cookie = createdResponse.headers.get('set-cookie').split(';')[0]; const created = await createdResponse.json();
   const persisted = async () => {
-    const response = await fetch(`http://127.0.0.1:8787/api/groups/${created.group.id}`, { headers: { Cookie: cookie } });
+    const response = await fetch(`http://127.0.0.1:8787/api/groups/${created.group.id}`, { headers: { authorization, Cookie: cookie } });
     assert.equal(response.status, 200); assert.equal((await response.json()).name, 'Persistence proof');
   };
   const backupFailure = `${'d'.repeat(40)}-99-1`;

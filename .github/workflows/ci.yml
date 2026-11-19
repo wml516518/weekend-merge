@@ -40,7 +40,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           tar -czf weekend-merge.tgz \
-            dist dist-server scripts/deploy.mjs scripts/backup-groups.mjs tests/fixtures/plan-request.demo.json
+            dist dist-server scripts/deploy.mjs scripts/backup-groups.mjs scripts/site-access.mjs tests/fixtures/plan-request.demo.json
 
       - name: Upload verified release
         if: github.ref == 'refs/heads/main'

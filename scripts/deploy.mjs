@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { access, chmod, mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { siteAuthorization } from './site-access.mjs';
 
 const appName = "weekend-merge";
 const releasePattern = /^[a-f0-9]{40}-\d+-\d+$/;
@@ -27,7 +28,7 @@ function snapshot(pm2, root) {
     throw new Error('Existing group server needs PM2 kill_timeout >= 240000 before deployment');
   }
   const env = {};
-  for (const key of ["DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) {
+  for (const key of ["WEEKEND_AUTH_USERNAME", "WEEKEND_AUTH_PASSWORD", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) {
     env[key] = previous[key] ?? previous.env?.[key] ?? "";
   }
   env.HOST ||= "127.0.0.1";
@@ -54,7 +55,7 @@ function snapshot(pm2, root) {
 async function waitForService(fetcher, pause, expectedRelease) {
   for (let attempt = 0; attempt < 12; attempt++) {
     try {
-      const response = await fetcher(`http://127.0.0.1:8787/${expectedRelease ? "healthz" : ""}`, {
+      const response = await fetcher('http://127.0.0.1:8787/healthz', {
         signal: AbortSignal.timeout(3000),
       });
       if (response.ok) {
@@ -68,8 +69,9 @@ async function waitForService(fetcher, pause, expectedRelease) {
   throw new Error("Service health check failed");
 }
 
-async function smokeTest(fetcher, directory) {
-  const home = await fetcher("http://127.0.0.1:8787/", { signal: AbortSignal.timeout(5000) });
+async function smokeTest(fetcher, directory, env) {
+  const authorization = siteAuthorization(env);
+  const home = await fetcher("http://127.0.0.1:8787/", { headers: { authorization }, signal: AbortSignal.timeout(5000) });
   if (!home.ok || !(await home.text()).toLowerCase().includes("<!doctype html>")) throw new Error("Static site smoke test failed");
   const request = JSON.parse(await readFile(join(directory, "tests", "fixtures", "plan-request.demo.json"), "utf8"));
   const date = new Date(Date.now() + 8 * 3600_000);
@@ -78,7 +80,7 @@ async function smokeTest(fetcher, directory) {
   request.mode = "demo";
   request.sessionId = `deploy-${Date.now()}`;
   const response = await fetcher("http://127.0.0.1:8787/.netlify/functions/plan", {
-    method: "POST", headers: { "content-type": "application/json" },
+    method: "POST", headers: { "content-type": "application/json", authorization },
     body: JSON.stringify(request), signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok || !response.headers.get("content-type")?.startsWith("application/x-ndjson")) throw new Error("API smoke test failed");
@@ -133,7 +135,7 @@ export async function deployRelease({ root, release, pm2 = runPm2, fetch: fetche
     try {
       await activate(next);
       await waitForService(fetcher, pause, release);
-      await smokeTest(fetcher, directory);
+      await smokeTest(fetcher, directory, next.env);
       pm2(["save"]);
       await writeFile(join(deployment, "current.json.tmp"), JSON.stringify({ release, previousScript: previous.script }), { mode: 0o600 });
       await rename(join(deployment, "current.json.tmp"), join(deployment, "current.json"));

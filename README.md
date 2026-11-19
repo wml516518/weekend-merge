@@ -5,6 +5,8 @@
 - [生产域名](https://weekendmerge.ailoong.net.cn/)（公网 HTTPS 证书/代理修复与本分支上线验证尚待运维完成）
 - [个人主页中的项目介绍](https://menglong-build-log.netlify.app/#projects)
 
+首次访问时，在浏览器登录框输入 `admin` / `WeekendMerge@2026`。首页、邀请、分享和规划接口使用同一个站点账号，无需注册。站点登录后，小组成员仍使用各自的邀请或恢复链接。默认密码随源码公开；正式部署可用服务端 `WEEKEND_AUTH_USERNAME` 和 `WEEKEND_AUTH_PASSWORD` 覆盖。
+
 默认首页为小组流程。`/#demo` 是不调用模型的固定演示；只读分享不携带成员偏好。旧 Netlify Functions 及 A/B 演示不提供小组持久化能力；生产小组功能需要下述单进程 Node/SQLite 服务。
 
 ## 使用与隐私

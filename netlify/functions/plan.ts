@@ -1,4 +1,5 @@
 import { createDemoRun } from "../../src/demo/demoRun";
+import { loginChallenge } from '../../scripts/site-access.mjs';
 import { PlanRequestSchema } from "../../src/contracts/agent";
 import { createDeepSeekModel } from "./agent/deepseek";
 import { jsonError, ndjsonStream, parseJsonRequest } from "./agent/http";
@@ -47,4 +48,5 @@ export function createPlanHandler(dependencies: {
   };
 }
 
-export default createPlanHandler();
+const handlePlan = createPlanHandler();
+export default (request: Request) => loginChallenge(request.headers.get('authorization'), process.env) ?? handlePlan(request);

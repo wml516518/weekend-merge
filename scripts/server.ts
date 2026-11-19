@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { createGroupRuntime } from "../server/groups/runtime";
+import { loginChallenge } from './site-access.mjs';
 
 const staticRoot = resolve(process.env.STATIC_ROOT ?? "dist");
 const trustedProxyDepth = Number(process.env.TRUSTED_PROXY_DEPTH ?? 1);
@@ -98,7 +99,7 @@ function serveStatic(target: ServerResponse, pathname: string): void {
   const extension = extname(filePath).toLowerCase();
   const isHtml = extension === ".html";
   target.writeHead(200, {
-    "Cache-Control": isHtml ? "no-cache" : "public, max-age=31536000, immutable",
+    "Cache-Control": isHtml ? "private, no-cache" : "private, max-age=31536000, immutable",
     "Content-Type": contentTypeByExtension[extension] ?? "application/octet-stream",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -137,6 +138,8 @@ const server = createServer((incoming, target) => {
     return;
   }
   const execute = async () => {
+    const denied = loginChallenge(incoming.headers.authorization, process.env);
+    if (denied) return denied;
     const request = toRequest(incoming, url);
     return groups.handle(request, clientKey(incoming));
   };
