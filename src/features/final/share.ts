@@ -10,6 +10,7 @@ import {
   type WeatherEvidence,
 } from "@/contracts/evidence";
 import { dateLabel } from "@/components/Ui";
+import { describeTrip, type CostLine } from "@/domain/tripDetails";
 import { exportItineraryLayout, exportRoutePoints } from "./exportLayout";
 import {
   weatherInterval,
@@ -63,7 +64,12 @@ export async function exportItinerary(
   participantCount = 2,
   weather?: WeatherEvidence,
 ) {
-  const layout = exportItineraryLayout(plan, !!weather);
+  const details = describeTrip(plan, participantCount);
+  const layout = exportItineraryLayout(
+    plan,
+    !!weather,
+    details.costLines.length,
+  );
   const canvas = document.createElement("canvas");
   canvas.width = 1000;
   canvas.height = layout.height;
@@ -95,6 +101,8 @@ export async function exportItinerary(
   drawExportMap(ctx, plan, layout.map);
   if (weather && layout.weather)
     drawWeatherStrip(ctx, weather, layout.weather);
+  if (layout.costBreakdown)
+    drawCostBreakdown(ctx, details.costLines, layout.costBreakdown);
   plan.stops.forEach((stop, i) => {
     const y = layout.itineraryTop + i * layout.stopHeight;
     ctx.fillStyle = "#e0e8d5";
@@ -120,6 +128,34 @@ export async function exportItinerary(
       y + 91,
       790,
     );
+    const transport = details.transportLegs[i];
+    if (transport) {
+      ctx.fillStyle = transport.mode === "metro" ? "#eef3ed" : "#f4f5ed";
+      roundRect(ctx, 140, y + 117, 790, 66, 8);
+      ctx.fill();
+      ctx.fillStyle = transport.mode === "metro" ? "#536d62" : "#6f7f63";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText(
+        transport.mode === "metro"
+          ? `地铁 · ${stationText(transport.fromStation, transport.fromLines)} → ${stationText(transport.toStation, transport.toLines)}`
+          : `步行 · ${transport.fromName} → ${transport.toName}`,
+        156,
+        y + 145,
+        758,
+      );
+      ctx.fillStyle = "#84917e";
+      ctx.font = "15px sans-serif";
+      ctx.fillText(
+        `${transport.distanceKm.toFixed(2)} km · 约 ${transport.durationMinutes} 分钟 · ${
+          transport.mode === "metro"
+            ? `每人 ¥${transport.farePerPerson.toFixed(2)}，${participantCount} 人共 ¥${transport.totalCost.toFixed(2)}`
+            : "无需交通费"
+        }`,
+        156,
+        y + 170,
+        758,
+      );
+    }
   });
   ctx.fillStyle = "#87937c";
   ctx.font = "20px sans-serif";
@@ -131,7 +167,7 @@ export async function exportItinerary(
     layout.footerTop,
   );
   ctx.fillText(
-    "路线为示意估算，非实时导航；出发前请核实地点信息。",
+    "地铁站为地点邻近站，线路、耗时与 4 元/人票价均为估算；出发前请核实地点与交通信息。",
     65,
     layout.footerTop + 40,
   );
@@ -145,6 +181,64 @@ export async function exportItinerary(
   link.href = url;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function drawCostBreakdown(
+  ctx: CanvasRenderingContext2D,
+  lines: CostLine[],
+  box: { x: number; y: number; width: number; height: number },
+) {
+  ctx.save();
+  ctx.fillStyle = "#fffefa";
+  ctx.strokeStyle = "#dfe5d7";
+  ctx.lineWidth = 1;
+  roundRect(ctx, box.x, box.y, box.width, box.height, 12);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#354e44";
+  ctx.font = "bold 23px sans-serif";
+  ctx.fillText("费用明细 / WHERE THE MONEY GOES", box.x + 24, box.y + 38);
+  lines.forEach((line, index) => {
+    const y = box.y + 80 + index * 44;
+    ctx.fillStyle = "#eef0e7";
+    ctx.fillRect(box.x + 22, y + 39, box.width - 44, 1);
+    ctx.fillStyle = line.kind === "transport" ? "#587068" : "#607358";
+    ctx.font = "16px sans-serif";
+    ctx.fillText(line.label, box.x + 24, y + 14, 600);
+    ctx.fillStyle = "#98a18f";
+    ctx.font = "13px sans-serif";
+    ctx.fillText(
+      line.quantity > 1
+        ? `¥${line.unitPrice.toFixed(2)} × ${line.quantity} 人`
+        : "一次性预留",
+      box.x + 24,
+      y + 33,
+      500,
+    );
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#536d52";
+    ctx.font = "bold 17px sans-serif";
+    ctx.fillText(
+      `¥${line.amount.toFixed(2)}`,
+      box.x + box.width - 24,
+      y + 22,
+    );
+    ctx.textAlign = "left";
+  });
+  ctx.fillStyle = "#9aa493";
+  ctx.font = "14px sans-serif";
+  ctx.fillText(
+    "地铁票价按每段 4 元/人预留；邻近站点、线路与耗时均为估算。",
+    box.x + 24,
+    box.y + box.height - 18,
+    box.width - 48,
+  );
+  ctx.restore();
+}
+
+function stationText(station?: string, lines: string[] = []) {
+  if (!station) return "附近站点待核实";
+  return lines.length ? `${station}（${lines.join("、")}）` : station;
 }
 
 function drawExportMap(

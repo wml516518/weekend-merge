@@ -1998,6 +1998,50 @@ textarea::placeholder {
   padding-top: 12px;
   border-top: 1px dashed #e5ebd8;
 }
+.final-transit {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 16px;
+  padding: 13px 15px;
+  border: 1px solid #dfe7da;
+  border-radius: 7px;
+  background: #f5f7ef;
+}
+.final-transit.metro {
+  border-color: #d9e2da;
+  background: #eef3ed;
+}
+.final-transit-icon {
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #657d5d;
+  background: #fffef9;
+}
+.final-transit > div {
+  min-width: 0;
+}
+.final-transit small {
+  color: #9aa88f;
+  font-size: 9px;
+}
+.final-transit h4 {
+  margin: 4px 0 5px;
+  color: #52684f;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.final-transit p {
+  margin: 0;
+  color: #8d9a84;
+  font-size: 9px;
+  line-height: 1.7;
+}
 .final-summary {
   border: 1px solid #e0e6d3;
   border-radius: 8px;
@@ -2095,6 +2139,85 @@ textarea::placeholder {
   border: 0;
   border-top: 1px solid #e5eadb;
   margin: 23px 0;
+}
+.final-costs {
+  border: 1px solid #e0e6d3;
+  border-radius: 8px;
+  background: #fffefa;
+  padding: 22px 24px;
+  margin: 18px 0;
+}
+.final-costs h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: #52684f;
+  font-family: "Noto Serif SC", serif;
+  font-size: 16px;
+  font-weight: 500;
+}
+.final-cost-lines {
+  border-top: 1px solid #e7ebdf;
+}
+.final-cost-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf0e7;
+}
+.final-cost-line > div {
+  min-width: 0;
+}
+.final-cost-line span,
+.final-cost-line small {
+  display: block;
+}
+.final-cost-line span {
+  overflow: hidden;
+  color: #627358;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.final-cost-line small {
+  margin-top: 3px;
+  color: #a1aa96;
+  font-size: 8px;
+}
+.final-cost-line b {
+  flex-shrink: 0;
+  color: #687e5d;
+  font-size: 11px;
+  font-weight: 500;
+}
+.final-cost-line.transport span {
+  color: #57716a;
+}
+.final-cost-line.buffer span,
+.final-cost-line.buffer small {
+  color: #a59e85;
+}
+.final-cost-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 15px;
+  color: #627358;
+  font-size: 11px;
+}
+.final-cost-total b {
+  color: #536d52;
+  font-size: 18px;
+  font-weight: 500;
+}
+.final-costs > p {
+  margin-top: 13px;
+  color: #a0aa94;
+  font-size: 8px;
+  line-height: 1.8;
 }
 .final-compromise {
   margin: 18px 0;

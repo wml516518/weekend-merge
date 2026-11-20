@@ -26,3 +26,13 @@ it("maps every stop inside the exported route-map bounds", () => {
     expect(point.y).toBeLessThanOrEqual(box.y + box.height - 40);
   }
 });
+
+it("adds a cost-detail section and taller rows when itemized spending is available", () => {
+  const compact = exportItineraryLayout(plan, true);
+  const detailed = exportItineraryLayout(plan, true, 6);
+
+  expect(detailed.costBreakdown).toBeDefined();
+  expect(detailed.costBreakdown!.height).toBeGreaterThan(200);
+  expect(detailed.stopHeight).toBeGreaterThan(compact.stopHeight);
+  expect(detailed.height).toBeGreaterThan(compact.height);
+});

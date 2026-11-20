@@ -7,17 +7,36 @@ export interface ExportBox {
   height: number;
 }
 
-export function exportItineraryLayout(plan: Itinerary, hasWeather: boolean) {
+export function exportItineraryLayout(
+  plan: Itinerary,
+  hasWeather: boolean,
+  detailLineCount = 0,
+) {
   const map: ExportBox = { x: 65, y: 390, width: 870, height: 340 };
   const weather: ExportBox | undefined = hasWeather
     ? { x: 65, y: 750, width: 870, height: 96 }
     : undefined;
-  const itineraryTop = weather ? 910 : 800;
-  const stopHeight = 190;
+  const detailCount = Math.max(0, detailLineCount);
+  const costBreakdown: ExportBox | undefined =
+    detailCount > 0
+      ? {
+          x: 65,
+          y: weather ? 874 : 762,
+          width: 870,
+          height: 120 + detailCount * 44,
+        }
+      : undefined;
+  const itineraryTop = costBreakdown
+    ? costBreakdown.y + costBreakdown.height + 42
+    : weather
+      ? 910
+      : 800;
+  const stopHeight = detailCount > 0 ? 232 : 190;
   const footerHeight = 150;
   return {
     map,
     weather,
+    costBreakdown,
     itineraryTop,
     stopHeight,
     footerTop: itineraryTop + plan.stops.length * stopHeight + 30,
@@ -29,12 +48,14 @@ export function exportRoutePoints(
   stops: Itinerary["stops"],
   box: ExportBox,
 ) {
-  const padding = 48;
+  const horizontalPadding = 48;
+  const topPadding = 82;
+  const bottomPadding = 48;
   const inner = {
-    x: box.x + padding,
-    y: box.y + padding,
-    width: box.width - padding * 2,
-    height: box.height - padding * 2,
+    x: box.x + horizontalPadding,
+    y: box.y + topPadding,
+    width: box.width - horizontalPadding * 2,
+    height: box.height - topPadding - bottomPadding,
   };
   const longitudes = stops.map((stop) => stop.longitude);
   const latitudes = stops.map((stop) => stop.latitude);
