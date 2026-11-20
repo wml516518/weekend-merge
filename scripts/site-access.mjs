@@ -1,6 +1,7 @@
 // Server-side only. The same credentials are used by deploy checks and site entry points.
 export function siteAuthorization(env = {}) {
-  const credentials = `${env.WEEKEND_AUTH_USERNAME || 'admin'}:${env.WEEKEND_AUTH_PASSWORD || 'WeekendMerge@2026'}`;
+  if (env.WEEKEND_AUTH_ENABLED?.trim().toLowerCase() !== 'true' || !env.WEEKEND_AUTH_PASSWORD) return;
+  const credentials = `${env.WEEKEND_AUTH_USERNAME || 'admin'}:${env.WEEKEND_AUTH_PASSWORD}`;
   return `Basic ${btoa(Array.from(new TextEncoder().encode(credentials), byte => String.fromCharCode(byte)).join(''))}`;
 }
 

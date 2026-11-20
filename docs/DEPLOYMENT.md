@@ -20,6 +20,8 @@ curl -fsS https://weekendmerge.ailoong.net.cn/api/groups
 
 证书校验必须开启。不要用 `curl -k` 的成功结果作为公网 HTTPS 验收依据，也不要固定 Cloudflare 的边缘 IP 到生产 hosts 文件。固定入口与好友网络验收完成前，保留临时 Quick Tunnel 作为备用；之后可由运维停止临时容器。
 
+站点默认公开访问，不启用全站登录。微信内置浏览器不支持 HTTP Basic Auth 的用户名/密码弹窗，默认启用会阻断邀请链接。只有在明确接受该限制时才设置 `WEEKEND_AUTH_ENABLED=true`、`WEEKEND_AUTH_USERNAME` 和 `WEEKEND_AUTH_PASSWORD`；单独的旧密码变量不会启用登录。小组隔离仍由邀请/恢复能力链接、同源检查、服务端 Cookie、成员授权与速率限制负责。
+
 ## 稳定数据与进程配置
 
 ```text

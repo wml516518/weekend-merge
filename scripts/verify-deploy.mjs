@@ -21,6 +21,7 @@ process.env.PUBLIC_ORIGIN = 'https://weekendmerge.ailoong.net.cn';
 process.env.GROUP_DB_PATH = join(root, 'data-runtime', 'groups.sqlite');
 process.env.GROUP_JOB_CONCURRENCY = '2';
 process.env.NODE_ENV = 'production';
+process.env.WEEKEND_AUTH_ENABLED = 'true';
 process.env.WEEKEND_AUTH_PASSWORD = 'deployment-test-password';
 const authorization = siteAuthorization(process.env);
 delete process.env.APP_RELEASE;

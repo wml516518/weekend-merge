@@ -13,7 +13,10 @@ let child: ChildProcess | undefined; let port: number; let output = '';
 const origin = 'https://weekendmerge.ailoong.net.cn';
 const jars = new Map<string, string>();
 async function request(session: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
-  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { authorization: siteAuthorization(process.env), Origin: origin, 'Content-Type': 'application/json', Cookie: jars.get(session) ?? '', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const requestHeaders = new Headers({ Origin: origin, 'Content-Type': 'application/json', Cookie: jars.get(session) ?? '', ...headers });
+  const authorization = siteAuthorization(process.env);
+  if (authorization) requestHeaders.set('authorization', authorization);
+  const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: requestHeaders, body: body === undefined ? undefined : JSON.stringify(body) });
   const cookie = response.headers.get('set-cookie'); if (cookie) jars.set(session, cookie.split(';')[0]);
   return response;
 }
@@ -39,16 +42,14 @@ beforeAll(async () => {
   await start();
 });
 afterAll(async () => { await stop(); rmSync(root, { recursive: true, force: true }); });
-it('challenges anonymous page and API requests before issuing a group cookie', async () => {
-  for (const path of ['/', '/api/groups', '/.netlify/functions/plan']) {
-    for (const authorization of ['', 'Basic d3Jvbmc6d3Jvbmc=']) {
-      const response = await request('visitor', path, undefined, { authorization });
-      expect(response.status).toBe(401);
-      expect(response.headers.get('www-authenticate')).toContain('Basic realm=');
-      expect(response.headers.has('set-cookie')).toBe(false);
-    }
-  }
-  expect((await request('visitor', '/')).status).toBe(200);
+it('allows WeChat-style anonymous visits when the optional site password is unset', async () => {
+  const home = await request('visitor', '/');
+  expect(home.status).toBe(200);
+  expect(home.headers.has('www-authenticate')).toBe(false);
+
+  const list = await request('visitor', '/api/groups');
+  expect(list.status).toBe(200);
+  expect(list.headers.get('set-cookie')).toContain('__Host-weekend_group=');
 });
 it('enforces production cookie, origin, API routing and static database/backup isolation', async () => {
   const list = await request('policy', '/api/groups');
