@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { createDemoRun } from "@/demo/demoRun";
+import { WeatherEvidenceSchema } from "@/contracts/evidence";
 import { PreferenceStep } from "@/features/wizard/PreferenceStep";
 import { SetupStep } from "@/features/wizard/SetupStep";
 import { ConsensusStep } from "@/features/wizard/ConsensusStep";
@@ -56,6 +57,15 @@ function LegacyApp({ explicitDemo }: { explicitDemo: boolean }) {
   const [shared, setShared] = useState<ReturnType<typeof decodeShare>>(null);
   const [shareError, setShareError] = useState("");
   const demoStarted = useRef(false);
+  const weather = useMemo(() => {
+    for (const event of [...events].reverse()) {
+      if (event.type === "tool.completed" && event.tool === "get_weather") {
+        const parsed = WeatherEvidenceSchema.safeParse(event.summary);
+        if (parsed.success) return parsed.data;
+      }
+    }
+    return undefined;
+  }, [events]);
   useEffect(() => {
     if (explicitDemo && !demoStarted.current) {
       demoStarted.current = true;
@@ -202,6 +212,7 @@ function LegacyApp({ explicitDemo }: { explicitDemo: boolean }) {
           plan={shared.plan}
           setup={shared.setup}
           participantCount={shared.participantCount}
+          weather={shared.weather}
           readOnly
         />
       ) : (
@@ -311,6 +322,7 @@ function LegacyApp({ explicitDemo }: { explicitDemo: boolean }) {
             <FinalItinerary
               plan={store.finalPlan}
               setup={setup}
+              weather={weather}
               onBack={() => store.goTo("workbench")}
             />
           )}

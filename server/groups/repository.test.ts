@@ -243,6 +243,28 @@ describe('persistent queue, rounds and fenced ownership', () => {
 });
 
 describe('owner selection, replan and finalization', () => {
+  it('keeps successful planning weather evidence after a local replan', () => {
+    const { repo } = database(); const { a } = queued(repo); const initial = repo.claimJob()!;
+    const weather = {
+      source: 'qweather', reference: '上海',
+      interval: { start: '2026-11-14T13:00:00+08:00', end: '2026-11-14T20:00:00+08:00' },
+      hourlyCount: 7, temperatureMinC: 18, temperatureMaxC: 24, maxPrecipitationProbability: 35,
+    };
+    repo.appendEvent(initial.id, initial.lease, {
+      type: 'tool.completed', tool: 'get_weather', summary: weather, durationMs: 12, source: 'qweather',
+    });
+    complete(repo, initial);
+    expect(repo.view('a', a.group.id).weather).toEqual(weather);
+
+    let view = repo.view('a', a.group.id);
+    view = repo.select('a', a.group.id, { version: view.stateVersion, planId: 'plan-2', lockedStopIds: [] });
+    repo.replan('a', a.group.id, {
+      version: view.stateVersion, rejectedStopId: 'stop-1', reason: '换一个', reasonCode: 'CHANGE_PLACE',
+    });
+    complete(repo, repo.claimJob()!, ['plan-revised']);
+
+    expect(repo.view('a', a.group.id).weather).toEqual(weather);
+  });
   it('accepts the actual Agent fallback event stream and persists its honest degraded source', async () => {
     const { repo } = database(); const { a } = queued(repo); const job = repo.claimJob()!;
     const events = await runPlanningAgent(job.request, { onEvent: event => repo.appendEvent(job.id, job.lease, event) });

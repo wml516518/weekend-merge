@@ -10,6 +10,7 @@ export const WeatherEvidenceSchema = z.object({
   hourlyCount: count, temperatureMinC: number.nullable(), temperatureMaxC: number.nullable(),
   maxPrecipitationProbability: number.min(0).max(100).nullable(),
 });
+export type WeatherEvidence = z.infer<typeof WeatherEvidenceSchema>;
 export const PlacesEvidenceSchema = z.object({
   source: z.literal("curated-shanghai-catalog"), matchedCount: count,
   selectedPlaces: z.array(z.object({ placeId: z.string(), name: z.string(), lastVerifiedAt: z.string() })),

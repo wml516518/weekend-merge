@@ -2004,6 +2004,63 @@ textarea::placeholder {
   background: #fffefa;
   padding: 25px;
 }
+.final-weather {
+  border: 1px solid #dce5d8;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 92% 12%, #fff8da 0 38px, transparent 39px),
+    linear-gradient(135deg, #f3f6eb, #e9f1e7);
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+.final-weather-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.final-weather-heading > span {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #6f815b;
+  background: #fffef6;
+  box-shadow: 0 5px 16px #b8c5a326;
+}
+.final-weather-heading small {
+  color: #96a185;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+}
+.final-weather-heading h2 {
+  margin: 2px 0 0;
+  color: #465d46;
+  font-family: "Noto Serif SC", serif;
+  font-size: 27px;
+  font-weight: 500;
+}
+.final-weather-rain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 15px 0 12px;
+  color: #718268;
+  font-size: 11px;
+}
+.final-weather-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #dde5d7;
+  color: #93a08a;
+  font-size: 9px;
+}
+.final-weather-meta span:last-child {
+  color: #6d8168;
+  font-weight: 600;
+}
 .final-summary h2 {
   font-family: "Noto Serif SC", serif;
   font-size: 17px;
