@@ -2,7 +2,9 @@ import { useState } from "react";
 import {
   ArrowLeft,
   CheckCheck,
+  CloudSun,
   Download,
+  Droplets,
   Footprints,
   Leaf,
   Link,
@@ -10,9 +12,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Itinerary, PlanSetup } from "@/contracts/agent";
+import type { WeatherEvidence } from "@/contracts/evidence";
 import { dateLabel, Tag } from "@/components/Ui";
 import { RouteMap } from "@/components/RouteMap";
 import { encodeShare, exportItinerary } from "./share";
+import {
+  weatherInterval,
+  weatherRain,
+  weatherSource,
+  weatherTemperature,
+} from "./weatherPresentation";
 
 export function FinalItinerary({
   plan,
@@ -21,6 +30,7 @@ export function FinalItinerary({
   readOnly = false,
   live = false,
   participantCount = 2,
+  weather,
 }: {
   plan: Itinerary;
   setup?: PlanSetup;
@@ -28,13 +38,14 @@ export function FinalItinerary({
   readOnly?: boolean;
   live?: boolean;
   participantCount?: number;
+  weather?: WeatherEvidence;
 }) {
   const [message, setMessage] = useState("");
   const [exporting, setExporting] = useState(false);
   async function download() {
     setExporting(true);
     try {
-      await exportItinerary(plan, setup, live, participantCount);
+      await exportItinerary(plan, setup, live, participantCount, weather);
       setMessage("行程长图已生成。");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "导出失败，请重试。");
@@ -44,7 +55,7 @@ export function FinalItinerary({
   }
   async function share() {
     try {
-      const hash = encodeShare(plan, setup, participantCount);
+      const hash = encodeShare(plan, setup, participantCount, weather);
       await navigator.clipboard.writeText(
         `${location.origin}${location.pathname}${hash}`,
       );
@@ -105,6 +116,25 @@ export function FinalItinerary({
           ))}
         </section>
         <aside>
+          {weather && (
+            <div className="final-weather">
+              <div className="final-weather-heading">
+                <span><CloudSun size={21} /></span>
+                <div>
+                  <small>周末天气参考</small>
+                  <h2>{weatherTemperature(weather)}</h2>
+                </div>
+              </div>
+              <p className="final-weather-rain">
+                <Droplets size={14} />
+                {weatherRain(weather)}
+              </p>
+              <div className="final-weather-meta">
+                <span>{weatherInterval(weather)}</span>
+                <span>{weatherSource(weather.source)}</span>
+              </div>
+            </div>
+          )}
           <div className="final-summary">
             <h2>周末小账本</h2>
             <div>

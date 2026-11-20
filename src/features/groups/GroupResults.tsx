@@ -122,6 +122,7 @@ export function GroupResults({
           setup={group.setup}
           live
           participantCount={group.members.length}
+          weather={group.weather}
         />
       </section>
     );

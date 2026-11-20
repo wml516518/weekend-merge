@@ -5,24 +5,38 @@ import {
   type Itinerary,
   type PlanSetup,
 } from "@/contracts/agent";
+import {
+  WeatherEvidenceSchema,
+  type WeatherEvidence,
+} from "@/contracts/evidence";
 import { dateLabel } from "@/components/Ui";
+import { exportItineraryLayout, exportRoutePoints } from "./exportLayout";
+import {
+  weatherInterval,
+  weatherRain,
+  weatherSource,
+  weatherTemperature,
+} from "./weatherPresentation";
 
 const ShareSchema = z.object({
   version: z.literal(1),
   participantCount: z.number().int().min(2).max(6).default(2),
   plan: ItinerarySchema,
   setup: PlanSetupSchema.optional(),
+  weather: WeatherEvidenceSchema.optional(),
 });
 export function encodeShare(
   plan: Itinerary,
   setup?: PlanSetup,
   participantCount = 2,
+  weather?: WeatherEvidence,
 ) {
   const payload = ShareSchema.parse({
     version: 1,
     plan,
     setup,
     participantCount,
+    weather,
   });
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   if (bytes.byteLength >= 6000)
@@ -47,10 +61,12 @@ export async function exportItinerary(
   setup?: PlanSetup,
   live = false,
   participantCount = 2,
+  weather?: WeatherEvidence,
 ) {
+  const layout = exportItineraryLayout(plan, !!weather);
   const canvas = document.createElement("canvas");
   canvas.width = 1000;
-  canvas.height = 650 + plan.stops.length * 190;
+  canvas.height = layout.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("浏览器暂不支持图片导出。");
   ctx.fillStyle = "#f8f8f3";
@@ -76,8 +92,11 @@ export async function exportItinerary(
     65,
     370,
   );
+  drawExportMap(ctx, plan, layout.map);
+  if (weather && layout.weather)
+    drawWeatherStrip(ctx, weather, layout.weather);
   plan.stops.forEach((stop, i) => {
-    const y = 465 + i * 190;
+    const y = layout.itineraryTop + i * layout.stopHeight;
     ctx.fillStyle = "#e0e8d5";
     ctx.beginPath();
     ctx.arc(90, y, 26, 0, Math.PI * 2);
@@ -109,12 +128,12 @@ export async function exportItinerary(
       ? "地点资料与费用为估算，请在出发前核实。"
       : "演示行程 · 地点、价格及天气为预设数据",
     65,
-    canvas.height - 100,
+    layout.footerTop,
   );
   ctx.fillText(
     "路线为示意估算，非实时导航；出发前请核实地点信息。",
     65,
-    canvas.height - 60,
+    layout.footerTop + 40,
   );
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/png"),
@@ -126,4 +145,159 @@ export async function exportItinerary(
   link.href = url;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function drawExportMap(
+  ctx: CanvasRenderingContext2D,
+  plan: Itinerary,
+  box: { x: number; y: number; width: number; height: number },
+) {
+  ctx.save();
+  ctx.fillStyle = "#efefe7";
+  roundRect(ctx, box.x, box.y, box.width, box.height, 14);
+  ctx.fill();
+  ctx.clip();
+
+  ctx.fillStyle = "#e3e5dc";
+  for (let row = 0; row < 4; row++) {
+    for (let column = 0; column < 8; column++) {
+      const x = box.x + column * 118 + (row % 2) * 18;
+      const y = box.y + row * 92 + 12;
+      ctx.fillRect(x, y, 86, 55);
+    }
+  }
+  ctx.fillStyle = "#c7dcdd";
+  ctx.beginPath();
+  ctx.moveTo(box.x + box.width - 70, box.y - 20);
+  ctx.bezierCurveTo(
+    box.x + box.width - 155,
+    box.y + 90,
+    box.x + box.width - 40,
+    box.y + 170,
+    box.x + box.width + 40,
+    box.y + 240,
+  );
+  ctx.lineTo(box.x + box.width + 40, box.y + box.height);
+  ctx.lineTo(box.x + box.width - 115, box.y + box.height);
+  ctx.bezierCurveTo(
+    box.x + box.width - 205,
+    box.y + 205,
+    box.x + box.width - 85,
+    box.y + 115,
+    box.x + box.width - 10,
+    box.y - 20,
+  );
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "#fffef9";
+  ctx.lineWidth = 22;
+  ctx.beginPath();
+  ctx.moveTo(box.x - 30, box.y + 250);
+  ctx.lineTo(box.x + box.width + 30, box.y + 55);
+  ctx.moveTo(box.x + 155, box.y - 30);
+  ctx.lineTo(box.x + 405, box.y + box.height + 30);
+  ctx.stroke();
+  ctx.strokeStyle = "#d8d9d0";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  const points = exportRoutePoints(plan.stops, box);
+  ctx.save();
+  ctx.beginPath();
+  points.forEach((point, index) =>
+    index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y),
+  );
+  ctx.strokeStyle = "#fffef9";
+  ctx.lineWidth = 10;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  ctx.strokeStyle = "#536d52";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([9, 7]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  points.forEach((point, index) => {
+    ctx.fillStyle = "#fffef9";
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 21, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#687e5d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = "#354e44";
+    ctx.font = "bold 17px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(String(index + 1), point.x, point.y + 6);
+    ctx.textAlign = "left";
+
+    const name = plan.stops[index].name;
+    ctx.font = "15px sans-serif";
+    const labelWidth = Math.min(190, Math.max(78, ctx.measureText(name).width + 24));
+    const labelX = Math.min(point.x + 24, box.x + box.width - labelWidth - 8);
+    const labelY = Math.max(box.y + 8, point.y - 19);
+    ctx.fillStyle = "rgba(255, 254, 249, .96)";
+    roundRect(ctx, labelX, labelY, labelWidth, 32, 6);
+    ctx.fill();
+    ctx.fillStyle = "#465547";
+    ctx.fillText(
+      name.length > 11 ? `${name.slice(0, 10)}…` : name,
+      labelX + 10,
+      labelY + 21,
+      labelWidth - 18,
+    );
+  });
+  ctx.fillStyle = "#354e44";
+  ctx.font = "bold 18px sans-serif";
+  ctx.fillText("ROUTE / 周末路线", box.x + 22, box.y + 31);
+  ctx.fillStyle = "#7f8b7a";
+  ctx.font = "14px sans-serif";
+  ctx.fillText("示意地图 · 非实时导航", box.x + 22, box.y + 53);
+  ctx.restore();
+}
+
+function drawWeatherStrip(
+  ctx: CanvasRenderingContext2D,
+  weather: WeatherEvidence,
+  box: { x: number; y: number; width: number; height: number },
+) {
+  ctx.save();
+  ctx.fillStyle = "#edf3ea";
+  roundRect(ctx, box.x, box.y, box.width, box.height, 12);
+  ctx.fill();
+  ctx.fillStyle = "#354e44";
+  ctx.font = "bold 22px sans-serif";
+  ctx.fillText(weatherTemperature(weather), box.x + 24, box.y + 36);
+  ctx.fillStyle = "#60745d";
+  ctx.font = "16px sans-serif";
+  ctx.fillText(weatherRain(weather), box.x + 24, box.y + 65);
+  ctx.fillStyle = "#7f8b76";
+  ctx.font = "15px sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText(
+    `${weatherSource(weather.source)} · ${weatherInterval(weather)}`,
+    box.x + box.width - 24,
+    box.y + 43,
+  );
+  ctx.textAlign = "left";
+  ctx.restore();
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
 }

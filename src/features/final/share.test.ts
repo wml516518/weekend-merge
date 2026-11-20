@@ -3,6 +3,18 @@ import { getCandidates } from "@/features/workbench/events";
 import { decodeShare, encodeShare } from "./share";
 describe("read-only share snapshot", () => {
   const plan = getCandidates(createDemoRun({ runId: "share-test" }))[0];
+  const weather = {
+    source: "qweather" as const,
+    reference: "上海" as const,
+    interval: {
+      start: "2026-11-21T13:00:00+08:00",
+      end: "2026-11-21T21:00:00+08:00",
+    },
+    hourlyCount: 8,
+    temperatureMinC: 18,
+    temperatureMaxC: 24,
+    maxPrecipitationProbability: 35,
+  };
   it("round-trips the itinerary and drops fields outside the shared contract", () => {
     const hash = encodeShare({
       ...plan,
@@ -34,5 +46,10 @@ describe("read-only share snapshot", () => {
         ).join(""),
       );
     expect(decodeShare(old)?.participantCount).toBe(2);
+  });
+  it("retains the final weather evidence in a read-only snapshot", () => {
+    expect(decodeShare(encodeShare(plan, undefined, 3, weather))?.weather).toEqual(
+      weather,
+    );
   });
 });

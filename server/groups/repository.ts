@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import { AgentEventSchema, PersonPreferencesSchema, PlanSetupSchema, ReplanRequestSchema } from '../../src/contracts/agent';
 import type { AgentEvent, PersonPreferences, PlanSetup, Itinerary, PlanDiff, ReplanRequest } from '../../src/contracts/agent';
+import { WeatherEvidenceSchema } from '../../src/contracts/evidence';
+import type { WeatherEvidence } from '../../src/contracts/evidence';
 import type { ClaimedGroupJob, FinalizeGroup, GroupCreated, GroupJoined, GroupJobView, GroupMember, GroupView, ReplanGroup, SaveGroupPreferences, SelectGroupPlan } from '../../src/contracts/groups';
 import { shanghaiPlaces } from '../../netlify/functions/agent/tools/places';
 import { estimateRoute } from '../../netlify/functions/agent/tools/route';
@@ -105,12 +107,14 @@ export class GroupRepository {
     const group = this.authorized(session, groupId, memberId); const grants = this.grants(session, groupId);
     const members = this.all<MemberRow>('SELECT m.*,p.version,p.payload,p.submitted FROM members m JOIN preferences p ON p.group_id=m.group_id AND p.member_id=m.id WHERE m.group_id=? AND p.revision=? ORDER BY m.owner DESC,m.rowid', groupId, group.revision);
     const publicMember = (m: MemberRow): GroupMember => ({ id: m.id, nickname: m.nickname, owner: !!m.owner, submitted: !!m.submitted });
+    const weather = this.latestWeather(group);
     return {
       id: group.id, name: group.name, targetCount: group.target_count, setup: JSON.parse(group.setup), revision: group.revision, stateVersion: group.state_version,
       state: group.state, createdAt: group.created_at, expiresAt: group.expires_at, inviteExpiresAt: group.invite_expires_at,
       canManage: grants.some(g => g.role === 'owner'), members: members.map(publicMember),
       myMembers: members.filter(m => (!memberId || memberId === m.id) && grants.some(g => g.role === 'member' && g.member_id === m.id)).map(m => ({ ...publicMember(m), version: m.version, ...(m.payload ? { preferences: JSON.parse(m.payload) as PersonPreferences } : {}) })),
       job: this.jobView(this.latestJob(group)), candidates: this.currentCandidates(group),
+      ...(weather ? { weather } : {}),
       ...(group.selected_plan_id ? { selectedPlanId: group.selected_plan_id } : {}), ...(group.final_plan_id ? { finalPlanId: group.final_plan_id } : {}),
       lockedStopIds: JSON.parse(group.locked_stop_ids), replanCount: group.replan_count,
     };
@@ -181,6 +185,18 @@ export class GroupRepository {
   }
   private successfulJobs(group: GroupRow): JobRow[] {
     return this.all<JobRow>("SELECT * FROM jobs WHERE group_id=? AND revision=? AND state='succeeded' ORDER BY rowid", group.id, group.revision);
+  }
+  /** Replans often reuse weather evidence, so keep the latest valid successful planning observation. */
+  private latestWeather(group: GroupRow): WeatherEvidence | undefined {
+    for (const job of this.successfulJobs(group).reverse()) {
+      const events = this.jobView(job)?.events ?? [];
+      for (const { event } of events.reverse()) {
+        if (event.type !== 'tool.completed' || event.tool !== 'get_weather') continue;
+        const parsed = WeatherEvidenceSchema.safeParse(event.summary);
+        if (parsed.success) return parsed.data;
+      }
+    }
+    return undefined;
   }
   /** A successful local adjustment replaces its saved base, preserving the other two alternatives. */
   private currentCandidates(group: GroupRow): Itinerary[] {
