@@ -2,7 +2,7 @@
 
 2–6 人各自填写偏好的上海周末规划应用。发起人设置人数、日期、时间和总预算，通过邀请链接让大家在各自浏览器加入；所有席位都提交后，服务器才冻结本轮偏好并生成三套方案。
 
-- [生产域名](https://weekendmerge.ailoong.net.cn/)（公网 HTTPS 证书/代理修复与本分支上线验证尚待运维完成）
+- [生产域名](https://weekendmerge.ailoong.net.cn/)（Cloudflare Tunnel 提供公网入口，证书与接口验证记录见[部署说明](docs/DEPLOYMENT.md)）
 - [个人主页中的项目介绍](https://menglong-build-log.netlify.app/#projects)
 
 首次访问时，在浏览器登录框输入 `admin` / `WeekendMerge@2026`。首页、邀请、分享和规划接口使用同一个站点账号，无需注册。站点登录后，小组成员仍使用各自的邀请或恢复链接。默认密码随源码公开；正式部署可用服务端 `WEEKEND_AUTH_USERNAME` 和 `WEEKEND_AUTH_PASSWORD` 覆盖。

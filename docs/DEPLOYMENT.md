@@ -1,6 +1,24 @@
 # GitHub Actions → 阿里云持久化部署
 
-目标根目录 `/home/admin/apps/weekend-merge`，PM2 名称 `weekend-merge`，单个 fork 实例，Node **22.11.0+**，监听 `127.0.0.1:8787`，Nginx 在外层提供 HTTPS。服务器仅解压已验证产物；不安装依赖、不前端构建。公网域名 `https://weekendmerge.ailoong.net.cn` 当前须先修复证书/Cloudflare 代理：直接源站的 Cloudflare Origin CA 证书不被公共浏览器信任。loopback 健康检查不等于公网 HTTPS 验证。
+目标根目录 `/home/admin/apps/weekend-merge`，PM2 名称 `weekend-merge`，单个 fork 实例，Node **22.11.0+**，监听 `127.0.0.1:8787`。公网入口为 `https://weekendmerge.ailoong.net.cn`，通过 Cloudflare Named Tunnel 访问应用，浏览器 HTTPS 由 Cloudflare 边缘证书提供。服务器仅解压已验证产物；不安装依赖、不前端构建。loopback 健康检查不等于公网 HTTPS 验证。
+
+## Cloudflare Tunnel 与 HTTPS
+
+生产 Tunnel 名称 `weekend-merge-prod`，ID 为 `6e3fa975-15cf-4219-b945-43c0be01f6a2`。Cloudflare DNS 中 `weekendmerge` 为已开启代理的 CNAME，目标为 `6e3fa975-15cf-4219-b945-43c0be01f6a2.cfargotunnel.com`。服务器使用官方镜像 `docker.io/cloudflare/cloudflared:latest`，Podman 容器名 `weekend-merge-tunnel`，重启策略为 `unless-stopped`，宿主机网络下连接 `http://127.0.0.1:8787`。凭据保存在 `/home/admin/cloudflared`，不得提交仓库或输出到日志。
+
+SSL/TLS 加密模式保持 Full (strict)，Universal SSL 必须启用，证书覆盖 `*.ailoong.net.cn` 和 `ailoong.net.cn`。若控制台显示“Enable Universal SSL”，说明当前已关闭；旧页面中的 Active 记录不能替代刷新后的实际设置。源站的 Origin CA 证书不用于浏览器直接访问。Tunnel 的本机 HTTP 连接受服务器 loopback 限制，公网请求走 Tunnel，无需开放应用的 8787 端口。
+
+生产 PM2 必须保存 `PUBLIC_ORIGIN=https://weekendmerge.ailoong.net.cn`；临时 Quick Tunnel 的域名只能用于临时联调，切回正式入口时同步恢复 origin 并执行 `pm2 save`。2026-11-15 已通过正式域名的 Cloudflare 边缘地址验证 HTTPS 首页与 `/healthz`、`/api/groups` 返回200，同源空参数 POST 返回业务校验400。用户网络仍可能保留旧 DNS 或 VPN Fake-IP 解析，遇到异常应同时检查公共解析和本地代理。
+
+只读检查命令：
+
+```bash
+sudo podman ps --filter name=weekend-merge-tunnel
+curl -fsS https://weekendmerge.ailoong.net.cn/healthz
+curl -fsS https://weekendmerge.ailoong.net.cn/api/groups
+```
+
+证书校验必须开启。不要用 `curl -k` 的成功结果作为公网 HTTPS 验收依据，也不要固定 Cloudflare 的边缘 IP 到生产 hosts 文件。固定入口与好友网络验收完成前，保留临时 Quick Tunnel 作为备用；之后可由运维停止临时容器。
 
 ## 稳定数据与进程配置
 
