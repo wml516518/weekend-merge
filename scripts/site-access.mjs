@@ -6,7 +6,8 @@ export function siteAuthorization(env = {}) {
 }
 
 export function loginChallenge(header, env) {
-  if (header === siteAuthorization(env)) return;
+  const authorization = siteAuthorization(env);
+  if (!authorization || header === authorization) return;
   return new Response('请登录周末共识局。', { status: 401, headers: {
     'WWW-Authenticate': 'Basic realm="Weekend Merge", charset="UTF-8"',
     'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store',
