@@ -71,7 +71,8 @@ async function waitForService(fetcher, pause, expectedRelease) {
 
 async function smokeTest(fetcher, directory, env) {
   const authorization = siteAuthorization(env);
-  const home = await fetcher("http://127.0.0.1:8787/", { headers: { authorization }, signal: AbortSignal.timeout(5000) });
+  const headers = authorization ? { authorization } : {};
+  const home = await fetcher("http://127.0.0.1:8787/", { headers, signal: AbortSignal.timeout(5000) });
   if (!home.ok || !(await home.text()).toLowerCase().includes("<!doctype html>")) throw new Error("Static site smoke test failed");
   const request = JSON.parse(await readFile(join(directory, "tests", "fixtures", "plan-request.demo.json"), "utf8"));
   const date = new Date(Date.now() + 8 * 3600_000);
@@ -80,7 +81,7 @@ async function smokeTest(fetcher, directory, env) {
   request.mode = "demo";
   request.sessionId = `deploy-${Date.now()}`;
   const response = await fetcher("http://127.0.0.1:8787/.netlify/functions/plan", {
-    method: "POST", headers: { "content-type": "application/json", authorization },
+    method: "POST", headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(request), signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok || !response.headers.get("content-type")?.startsWith("application/x-ndjson")) throw new Error("API smoke test failed");

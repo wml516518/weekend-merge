@@ -5,6 +5,7 @@ import { loginChallenge, siteAuthorization } from "../scripts/site-access.mjs";
 it("allows anonymous visitors when the optional site password is not configured", () => {
   expect(siteAuthorization({})).toBeUndefined();
   expect(loginChallenge(undefined, {})).toBeUndefined();
+  expect(loginChallenge("Basic invalid", {})).toBeUndefined();
 });
 
 it("does not keep WeChat visitors behind a login when only an old password is present", () => {

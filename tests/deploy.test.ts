@@ -74,8 +74,10 @@ describe("server artifact deployment", () => {
   it("switches to the verified artifact and preserves the existing model environment and source", async () => {
     const f = await fixture();
     const paths: string[] = [];
+    const authorizationHeaders: unknown[] = [];
     const fetcher = async (url: string, options?: RequestInit) => {
       paths.push(new URL(url).pathname);
+      authorizationHeaders.push((options?.headers as Record<string, string> | undefined)?.authorization);
       if (url.endsWith("/healthz")) return Response.json({ status: "ok", release: f.active().env.APP_RELEASE });
       if (options?.method === "POST") {
         expect(JSON.parse(String(options.body))).toMatchObject({ mode: "demo" });
@@ -92,6 +94,7 @@ describe("server artifact deployment", () => {
     expect(f.active().env).toMatchObject({ DEEPSEEK_API_KEY: "private-test-key", DEEPSEEK_MODEL: "deepseek-flash", APP_RELEASE: f.release });
     expect(f.active().env).toMatchObject({ QWEATHER_API_KEY: "private-weather-key", QWEATHER_API_HOST: "example.qweatherapi.com" });
     expect(f.active().env).toMatchObject({ GROUP_DB_PATH: join(f.root, 'data-runtime', 'groups.sqlite'), GROUP_JOB_CONCURRENCY: '2', PUBLIC_ORIGIN: 'https://weekendmerge.ailoong.net.cn' });
+    expect(authorizationHeaders.filter(value => value !== undefined)).toEqual([]);
     expect(f.active()).toMatchObject({ node_args: ['--experimental-sqlite'], instances: 1, exec_mode: 'fork', kill_timeout: 240000 });
     expect(await readFile(join(f.root, ".env"), "utf8")).toBe("server-only-secret");
     expect(paths).toContain("/.netlify/functions/plan");
