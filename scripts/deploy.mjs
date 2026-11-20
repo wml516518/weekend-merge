@@ -28,7 +28,7 @@ function snapshot(pm2, root) {
     throw new Error('Existing group server needs PM2 kill_timeout >= 240000 before deployment');
   }
   const env = {};
-  for (const key of ["WEEKEND_AUTH_USERNAME", "WEEKEND_AUTH_PASSWORD", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) {
+  for (const key of ["WEEKEND_AUTH_ENABLED", "WEEKEND_AUTH_USERNAME", "WEEKEND_AUTH_PASSWORD", "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "QWEATHER_API_KEY", "QWEATHER_API_HOST", "HOST", "PORT", "STATIC_ROOT", "TRUSTED_PROXY_DEPTH", "APP_RELEASE", "NODE_ENV", "GROUP_DB_PATH", "GROUP_JOB_CONCURRENCY", "PUBLIC_ORIGIN"]) {
     env[key] = previous[key] ?? previous.env?.[key] ?? "";
   }
   env.HOST ||= "127.0.0.1";
