@@ -9,12 +9,15 @@ import {
   Leaf,
   Link,
   LockKeyhole,
+  ReceiptText,
   Sparkles,
+  TrainFront,
 } from "lucide-react";
 import type { Itinerary, PlanSetup } from "@/contracts/agent";
 import type { WeatherEvidence } from "@/contracts/evidence";
 import { dateLabel, Tag } from "@/components/Ui";
 import { RouteMap } from "@/components/RouteMap";
+import { describeTrip } from "@/domain/tripDetails";
 import { encodeShare, exportItinerary } from "./share";
 import {
   weatherInterval,
@@ -67,6 +70,8 @@ export function FinalItinerary({
     }
   }
   const subtotal = plan.stops.reduce((sum, s) => sum + s.cost, 0);
+  const details = describeTrip(plan, participantCount);
+  const budgetRemaining = setup ? setup.budget - plan.totalCost : 0;
   return (
     <main className="final-page">
       <div className="center-heading">
@@ -103,12 +108,33 @@ export function FinalItinerary({
                 </p>
                 <Tag>{stop.tags[0] ?? "周末活动"}</Tag>
                 <span className="final-price">
-                  {participantCount} 人 ¥{stop.cost}
+                  {participantCount} 人 ¥{stop.cost.toFixed(2)} · 人均 ¥
+                  {(stop.cost / participantCount).toFixed(2)}
                 </span>
                 {i < plan.stops.length - 1 && (
-                  <div className="transit-note">
-                    <Footprints size={13} />
-                    下一站 {plan.stops[i + 1].startTime} 开始 · 路线为估算
+                  <div
+                    className={`final-transit ${details.transportLegs[i].mode}`}
+                  >
+                    <span className="final-transit-icon">
+                      {details.transportLegs[i].mode === "metro" ? (
+                        <TrainFront size={16} />
+                      ) : (
+                        <Footprints size={16} />
+                      )}
+                    </span>
+                    <div>
+                      <small>
+                        前往下一站 · 预计{" "}
+                        {details.transportLegs[i].durationMinutes} 分钟
+                      </small>
+                      <h4>
+                        {transportHeading(details.transportLegs[i])}
+                      </h4>
+                      <p>
+                        {details.transportLegs[i].distanceKm.toFixed(2)} km ·{" "}
+                        {transportCost(details.transportLegs[i], participantCount)}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -139,27 +165,33 @@ export function FinalItinerary({
             <h2>周末小账本</h2>
             <div>
               <span>站点费用合计</span>
-              <b>¥{subtotal}</b>
+              <b>¥{money(subtotal)}</b>
             </div>
-            {plan.totalCost >= subtotal && (
+            {details.transportSubtotal > 0 && (
               <div>
-                <span>其他费用</span>
-                <b>¥{plan.totalCost - subtotal}</b>
+                <span>交通预留</span>
+                <b>¥{money(details.transportSubtotal)}</b>
+              </div>
+            )}
+            {details.buffer > 0 && (
+              <div>
+                <span>预算缓冲</span>
+                <b>¥{money(details.buffer)}</b>
               </div>
             )}
             <div className="summary-total">
               <span>{participantCount} 人总计</span>
-              <b>¥{plan.totalCost}</b>
+              <b>¥{money(plan.totalCost)}</b>
             </div>
             <div>
               <span>人均估算</span>
               <b>
-                ¥{Math.round((plan.totalCost / participantCount) * 100) / 100}
+                ¥{money(plan.totalCost / participantCount)}
               </b>
             </div>
             <p>
               {setup
-                ? `预算余量 ¥${setup.budget - plan.totalCost}`
+                ? `预算余量 ¥${money(budgetRemaining)}`
                 : "费用为估算"}{" "}
               · 费用拆分以工具结果为准
             </p>
@@ -174,8 +206,38 @@ export function FinalItinerary({
             </div>
             <div>
               <span>{live || readOnly ? "预计交通段" : "换乘次数"}</span>
-              <b>{plan.transfers} 次</b>
+              <b>{details.transportLegs.length} 次</b>
             </div>
+          </div>
+          <div className="final-costs">
+            <h2>
+              <ReceiptText size={17} />
+              费用明细
+            </h2>
+            <div className="final-cost-lines">
+              {details.costLines.map((line, index) => (
+                <div
+                  className={`final-cost-line ${line.kind}`}
+                  key={`${line.kind}-${line.label}-${index}`}
+                >
+                  <div>
+                    <span>{line.label}</span>
+                    <small>
+                      ¥{line.unitPrice.toFixed(2)}
+                      {line.quantity > 1 ? ` × ${line.quantity} 人` : ""}
+                    </small>
+                  </div>
+                  <b>¥{line.amount.toFixed(2)}</b>
+                </div>
+              ))}
+            </div>
+            <div className="final-cost-total">
+              <span>{participantCount} 人合计</span>
+              <b>¥{money(plan.totalCost)}</b>
+            </div>
+            <p>
+              交通按每段地铁 4 元/人预留；邻近站点、线路和耗时均为估算，出发前请以地图应用为准。
+            </p>
           </div>
           <div className="final-compromise">
             <Sparkles size={19} />
@@ -219,4 +281,27 @@ export function FinalItinerary({
       </p>
     </main>
   );
+}
+
+function stationLabel(station?: string, lines: string[] = []) {
+  if (!station) return "附近站点待核实";
+  return lines.length ? `${station}（${lines.join("、")}）` : station;
+}
+
+function transportHeading(leg: ReturnType<typeof describeTrip>["transportLegs"][number]) {
+  if (leg.mode === "walking")
+    return `步行 · ${leg.fromName} → ${leg.toName}`;
+  return `地铁 · ${stationLabel(leg.fromStation, leg.fromLines)} → ${stationLabel(leg.toStation, leg.toLines)}`;
+}
+
+function transportCost(
+  leg: ReturnType<typeof describeTrip>["transportLegs"][number],
+  participantCount: number,
+) {
+  if (leg.mode === "walking") return "无需交通费";
+  return `每人 ¥${leg.farePerPerson.toFixed(2)} · ${participantCount} 人共 ¥${leg.totalCost.toFixed(2)}`;
+}
+
+function money(value: number) {
+  return value.toFixed(2);
 }
