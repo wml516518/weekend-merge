@@ -603,12 +603,22 @@ it("limits adjustment reasons to 160 characters and sends only the selected stop
   );
   await user.click(
     screen.getByRole("button", {
-      name: `换个地方 ${candidates[0].stops[0].name}`,
+      name: `换个地方：${candidates[0].stops[0].name}`,
     }),
   );
   expect(screen.getByLabelText("调整原因")).toHaveAttribute("maxLength", "160");
+  expect(screen.getByRole("dialog")).toHaveAccessibleName(`换个地方：${candidates[0].stops[0].name}`);
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const reopen = screen.getByRole("button", { name: `换个地方：${candidates[0].stops[0].name}` });
+  expect(reopen).toHaveFocus();
+  await user.click(reopen);
+  await user.click(screen.getByRole("button", { name: "取消调整" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await user.click(reopen);
   await user.type(screen.getByLabelText("调整原因"), "希望更安静");
   await user.click(screen.getByRole("button", { name: "提交局部调整" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(writes[0].body).toEqual({
     version: 4,
     rejectedStopId: candidates[0].stops[0].id,
@@ -854,7 +864,7 @@ it("locks a selected stop on the server and prevents a third local adjustment", 
   );
   const stop = candidates[0].stops[0];
   expect(
-    screen.getByRole("button", { name: `换个地方 ${stop.name}` }),
+    screen.getByRole("button", { name: `换个地方：${stop.name}` }),
   ).toBeDisabled();
   await user.click(screen.getByRole("button", { name: `锁定 ${stop.name}` }));
   expect(writes[0].body).toEqual({

@@ -93,7 +93,7 @@ export function RouteMap({
           />
           <path d="M105 265 180 230 215 305 132 344Z" fill="#cbd9bc" />
           <path d="m385 55 60-18 37 55-60 38Z" fill="#cbd9bc" />
-          <g fill="#9a9e93" fontSize="13" fontFamily="sans-serif">
+          <g fill="#9a9e93" fontSize="14" fontFamily="sans-serif">
             <text x="100" y="70">
               上海街区
             </text>
@@ -155,7 +155,7 @@ export function RouteMap({
                 y={p.y + 5}
                 textAnchor="middle"
                 fill={i === activeIndex ? "white" : "#354e44"}
-                fontSize="15"
+                fontSize="16"
                 fontWeight="700"
               >
                 {i + 1}
@@ -169,7 +169,7 @@ export function RouteMap({
                 fill="#fffef9"
                 opacity=".96"
               />
-              <text x={p.x + 35} y={p.y + 4} fontSize="11" fill="#465547">
+              <text x={p.x + 35} y={p.y + 4} fontSize="12" fill="#465547">
                 <title>{p.name}</title>
                 {p.name.length > 9 ? `${p.name.slice(0, 8)}…` : p.name}
               </text>

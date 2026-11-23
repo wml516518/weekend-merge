@@ -30,7 +30,7 @@
   flex-direction: column;
   gap: 9px;
   color: var(--ink-700);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 
@@ -79,7 +79,7 @@
   display: inline-flex;
   align-items: center;
   color: #858a7e;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-nav .nav-active {
@@ -110,7 +110,7 @@
   align-items: center;
   gap: 7px;
   color: #748264;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -131,7 +131,7 @@
 
 .group-home-intro > h1 {
   max-width: 520px;
-  font-size: clamp(40px, 5vw, 62px);
+  font-size: calc(clamp(40px, 5vw, 62px) + 1px);
   line-height: 1.42;
   letter-spacing: -2px;
   margin: 22px 0 24px;
@@ -140,7 +140,7 @@
 .group-home-intro > p,
 .group-common > p {
   color: var(--ink-700);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 2;
 }
 
@@ -160,7 +160,7 @@
   border-radius: 999px;
   background: rgb(255 254 250 / 78%);
   color: var(--ink-700);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-shell small,
@@ -205,7 +205,7 @@
 .group-create h2,
 .group-join h1 {
   margin: 10px 0 6px;
-  font-size: clamp(25px, 3vw, 31px);
+  font-size: calc(clamp(25px, 3vw, 31px) + 1px);
   line-height: 1.45;
 }
 
@@ -213,7 +213,7 @@
 .group-join > p {
   margin: 0;
   color: var(--ink-500);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.85;
 }
 
@@ -243,7 +243,7 @@
   gap: 7px;
   margin: -8px 0 0;
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
 }
 
@@ -272,7 +272,7 @@
 .group-links-heading h2,
 .group-members-heading h2 {
   margin: 4px 0 0;
-  font-size: 22px;
+  font-size: 23px;
 }
 
 .group-list-heading > svg {
@@ -293,13 +293,13 @@
 
 .group-list-card h3 {
   margin: 8px 0 3px;
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .group-list-card p {
   margin: 0;
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-state {
@@ -311,7 +311,7 @@
   border-radius: 999px;
   background: var(--moss-100);
   color: #657653;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
 }
@@ -347,7 +347,7 @@
   display: grid;
   grid-template-columns: minmax(300px, 0.86fr) minmax(0, 1.5fr);
   gap: 26px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .group-common,
@@ -367,8 +367,7 @@
 }
 
 .group-common {
-  position: sticky;
-  top: 24px;
+  position: static;
 }
 
 .group-round-label {
@@ -379,7 +378,7 @@
 
 .group-common h1 {
   margin: 8px 0 24px;
-  font-size: clamp(31px, 4vw, 43px);
+  font-size: calc(clamp(31px, 4vw, 43px) + 1px);
   line-height: 1.38;
   overflow-wrap: anywhere;
 }
@@ -402,7 +401,7 @@
   padding: 15px;
   background: #fffefa;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
@@ -420,7 +419,7 @@
 
 .group-facts small {
   margin-bottom: 2px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .group-lifecycle {
@@ -431,7 +430,7 @@
   padding: 12px 13px;
   border-radius: 8px;
   background: #f7f8f2;
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.7 !important;
 }
 
@@ -455,14 +454,14 @@
 .group-members-heading > strong {
   color: var(--moss-700);
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 29px;
   font-weight: 500;
 }
 
 .group-progress-copy {
   margin: 17px 0 10px;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-progress {
@@ -502,7 +501,7 @@
   border-radius: 28px 28px 10px 10px;
   padding: 15px 7px;
   background: #fffefa;
-  font-size: 12px;
+  font-size: 13px;
   overflow-wrap: anywhere;
   text-align: center;
 }
@@ -528,12 +527,12 @@
   border-radius: 50%;
   background: #fffefa;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 21px;
 }
 
 .group-seat-state {
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .group-seats .submitted .group-seat-state {
@@ -567,13 +566,13 @@
 .group-identity-copy p {
   margin: 0;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-identity-copy small {
   display: block;
   margin-bottom: 3px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .group-identity-copy strong {
@@ -584,7 +583,7 @@
   width: 100%;
   margin: 4px 0;
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-links {
@@ -608,7 +607,7 @@
 .group-link input {
   color: #6e756b !important;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
 }
 
 .group-copy-button {
@@ -624,7 +623,7 @@
   border-radius: 8px;
   background: #f4f6ef;
   color: var(--ink-700) !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   line-height: 1.75 !important;
 }
 
@@ -662,7 +661,7 @@
   width: max-content;
   max-width: 100%;
   margin-left: auto;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-results {
@@ -687,7 +686,7 @@
 
 .group-section-heading h2 {
   margin: 6px 0 0;
-  font-size: 27px;
+  font-size: 28px;
 }
 
 .group-attempt {
@@ -695,7 +694,7 @@
   border-radius: 999px;
   background: #f0f3ea;
   color: #718163;
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -716,7 +715,7 @@
   position: relative;
   padding: 0 0 18px;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-events li:not(:last-child)::after {
@@ -761,7 +760,7 @@
   background: #f4f6ef;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-consensus {
@@ -781,18 +780,18 @@
   top: -29px;
   color: rgb(113 133 96 / 10%);
   font-family: Georgia, serif;
-  font-size: 140px;
+  font-size: 141px;
 }
 
 .group-consensus h2 {
   margin: 8px 0 5px;
-  font-size: 27px;
+  font-size: 28px;
 }
 
 .group-consensus > p {
   margin: 0 0 16px;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-consensus-chips {
@@ -808,7 +807,7 @@
   border-radius: 999px;
   background: rgb(255 254 250 / 70%);
   color: #5f7450;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-consensus-notes {
@@ -820,13 +819,13 @@
 .group-consensus-notes p {
   margin: 4px 0;
   color: var(--ink-700);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-catalog-note {
   margin: 13px 0 0;
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .group-candidates {
@@ -861,21 +860,21 @@
 
 .group-candidate > small {
   color: #768768;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1px;
   text-transform: uppercase;
 }
 
 .group-candidate h3 {
   margin: 11px 0 9px;
-  font-size: 23px;
+  font-size: 24px;
   line-height: 1.48;
 }
 
 .group-candidate > p {
   margin: 0 0 15px;
   color: var(--ink-700);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .group-plan-metrics {
@@ -891,7 +890,7 @@
   gap: 5px;
   min-width: 0;
   color: #6c7c60;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .group-plan-metrics svg {
@@ -902,7 +901,7 @@
   flex: 1;
   padding-left: 17px;
   color: var(--ink-700);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-candidate button {
@@ -922,7 +921,7 @@
 
 .group-selected-heading h2 {
   margin: 3px 0 0;
-  font-size: 27px;
+  font-size: 28px;
 }
 
 .group-itinerary {
@@ -958,13 +957,13 @@
 
 .group-stop h3 {
   margin: 8px 0 5px;
-  font-size: 21px;
+  font-size: 22px;
 }
 
 .group-stop p {
   margin: 0 0 6px;
   color: var(--ink-700);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-locked-tag {
@@ -976,22 +975,31 @@
   border-radius: 4px;
   background: var(--moss-100);
   color: #657853;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .group-replan {
   display: grid;
   gap: 14px;
-  margin: 24px 0;
-  max-width: 600px;
-  padding: 20px;
-  border: 1px solid #e0e5da;
-  border-radius: 10px;
-  background: #f9faf5;
+  margin: 20px 0 0;
 }
 
 .group-replan textarea {
   min-height: 100px;
+}
+
+.group-selected .group-change-place {
+  color: #8a5137;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.group-selected .group-change-place:hover:not(:disabled) {
+  color: #663a27;
+}
+
+.group-selected .group-change-place:disabled {
+  color: var(--ink-500);
 }
 
 .group-form-state {
@@ -1002,7 +1010,7 @@
   border-radius: 6px;
   background: #eef2e7;
   color: #68795a;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .group-shell .wizard-page {
@@ -1078,7 +1086,7 @@
   }
 
   .group-home-intro > h1 {
-    font-size: 41px;
+    font-size: 42px;
   }
 
   .group-create,
@@ -1148,7 +1156,7 @@
 
 @media (max-width: 520px) {
   .group-shell .brand {
-    font-size: 18px;
+    font-size: 19px;
   }
 
   .group-shell .brand-mark {
@@ -1162,7 +1170,7 @@
 
   .group-nav button,
   .group-demo-link {
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .group-fields {
@@ -1171,7 +1179,7 @@
   }
 
   .group-home-intro > h1 {
-    font-size: 37px;
+    font-size: 38px;
   }
 
   .group-value-list span:last-child {
@@ -1184,11 +1192,11 @@
 
   .group-seats li {
     min-height: 136px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .group-members-heading > strong {
-    font-size: 24px;
+    font-size: 25px;
   }
 
   .group-own-action > .button,

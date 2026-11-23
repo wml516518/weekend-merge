@@ -11,10 +11,10 @@
   background: #fffefa;
   padding: 0 10px;
   color: #535d4c;
-  font-size: 12px;
+  font-size: 13px;
 }
 .setup-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: #8b9878;
   margin: 10px 0;
 }
@@ -25,13 +25,13 @@
   min-width: 0;
 }
 .plain-fieldset > legend {
-  font-size: 12px;
+  font-size: 13px;
   padding: 0;
   margin-bottom: 10px;
   width: 100%;
 }
 .plain-fieldset > legend > small {
-  font-size: 10px;
+  font-size: 11px;
   color: #919d80;
 }
 .interest {
@@ -59,7 +59,7 @@
   border: 1px solid #e1e5d6;
   padding: 7px 10px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 11px;
   color: #899679;
   display: flex;
   align-items: center;
@@ -79,13 +79,13 @@
   display: block;
   text-align: right;
   margin-top: 4px;
-  font-size: 9px;
+  font-size: 10px;
   color: #96a183;
 }
 .candidate-title {
   display: block;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   line-height: 1.7;
   margin-bottom: 7px;
@@ -116,7 +116,7 @@
   margin: 20px 0 10px;
 }
 .planning-empty > p {
-  font-size: 12px;
+  font-size: 13px;
 }
 .planning-empty > .trace-panel {
   display: block !important;
@@ -125,7 +125,7 @@
   text-align: left;
 }
 .share-message {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #768a60;
   margin-top: 14px;
@@ -151,7 +151,7 @@
     gap: 10px;
   }
   .candidate-title {
-    font-size: 14px;
+    font-size: 15px;
   }
 }
 @media (max-width: 760px) {
@@ -173,10 +173,10 @@
   }
   .step label,
   .compact .step > label {
-    font-size: 8px;
+    font-size: 9px;
   }
   .candidate-title {
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.7;
     margin: 0;
   }
@@ -184,7 +184,7 @@
     height: 47px;
   }
   .check-chip {
-    font-size: 11px;
+    font-size: 12px;
   }
   .footer {
     padding-bottom: 95px;
@@ -198,12 +198,12 @@
     height: 360px;
   }
   .route-heading h2 {
-    font-size: 18px;
+    font-size: 19px;
   }
   .step > span {
     width: 18px;
     height: 18px;
-    font-size: 8px;
+    font-size: 9px;
   }
   .header {
     padding-left: 16px;
@@ -213,6 +213,6 @@
     gap: 6px;
   }
   .brand {
-    font-size: 20px;
+    font-size: 21px;
   }
 }

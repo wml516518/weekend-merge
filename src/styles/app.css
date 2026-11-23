@@ -69,11 +69,11 @@ h1 {
   line-height: 1.6;
 }
 h2 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 h3 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 svg {
@@ -105,7 +105,7 @@ button:hover:not(:disabled) {
   gap: 12px;
   text-align: left;
   letter-spacing: -0.7px;
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 700;
   padding: 0;
 }
@@ -134,7 +134,7 @@ button:hover:not(:disabled) {
 }
 .brand small {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 3.6px;
   font-weight: 500;
   margin-top: 1px;
@@ -144,7 +144,7 @@ button:hover:not(:disabled) {
   height: 100%;
   align-items: center;
   gap: 34px;
-  font-size: 12px;
+  font-size: 13px;
   margin-left: 50px;
 }
 .top-nav button {
@@ -176,7 +176,7 @@ button:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   color: #777c6e;
   border: 1px solid #dce1d3;
   border-radius: 5px;
@@ -203,7 +203,7 @@ button:hover:not(:disabled) {
   place-items: center;
   background: #e3e9d8;
   color: #55644b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 .avatar-pair span + span {
@@ -235,10 +235,10 @@ button:hover:not(:disabled) {
   gap: 9px;
   color: #a0a396;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
 }
 .step > span {
-  font-size: 9px;
+  font-size: 10px;
   width: 23px;
   height: 23px;
   border: 1px solid #dfe2d7;
@@ -275,7 +275,7 @@ button:hover:not(:disabled) {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
   color: #92978a;
 }
 .button {
@@ -286,7 +286,7 @@ button:hover:not(:disabled) {
   align-items: center;
   gap: 12px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -305,7 +305,7 @@ button:hover:not(:disabled) {
   color: var(--green);
 }
 .tag {
-  font-size: 10px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -319,10 +319,10 @@ button:hover:not(:disabled) {
   display: inline-flex;
   gap: 7px;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2.1px;
   display: flex;
   align-items: center;
@@ -344,7 +344,7 @@ button:hover:not(:disabled) {
   gap: 94px;
 }
 .setup-left h1 {
-  font-size: 36px;
+  font-size: 37px;
   margin: 17px 0 16px;
   line-height: 1.7;
   letter-spacing: 1px;
@@ -367,7 +367,7 @@ button:hover:not(:disabled) {
 }
 .intro {
   color: #8b8f83;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.95;
   letter-spacing: 0.5px;
 }
@@ -383,13 +383,13 @@ button:hover:not(:disabled) {
   margin-bottom: 22px;
 }
 .form-heading h2 {
-  font-size: 13px;
+  font-size: 14px;
 }
 .form-heading > span {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   color: #93978b;
 }
 .field {
@@ -399,7 +399,7 @@ button:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   margin-bottom: 9px;
 }
@@ -408,7 +408,7 @@ button:hover:not(:disabled) {
 }
 .field label small {
   color: #a0a394;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   margin-left: auto;
 }
@@ -431,16 +431,16 @@ button:hover:not(:disabled) {
 .fixed-input {
   padding: 0 11px;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 13px;
 }
 .fixed-input .tag {
-  font-size: 8px;
+  font-size: 9px;
   padding: 3px 5px;
   background: #f0f1e9;
   color: #939781;
 }
 .en-label {
-  font-size: 8px;
+  font-size: 9px;
   color: #9ba08d;
   margin-left: 3px;
 }
@@ -452,7 +452,7 @@ button:hover:not(:disabled) {
   border: 0;
   background: transparent;
   color: #535d4c;
-  font-size: 11px;
+  font-size: 12px;
   padding: 0 30px 0 13px;
   appearance: none;
   height: 100%;
@@ -472,7 +472,7 @@ button:hover:not(:disabled) {
   background: transparent;
   border: 0;
   color: #4f5a47;
-  font-size: 13px;
+  font-size: 14px;
   max-width: 110px;
 }
 .time-range input::-webkit-calendar-picker-indicator {
@@ -483,7 +483,7 @@ button:hover:not(:disabled) {
   color: #c2c8b5;
 }
 .duration {
-  font-size: 9px;
+  font-size: 10px;
   margin-left: auto;
   color: #84916e;
   background: #eff3e6;
@@ -502,7 +502,7 @@ button:hover:not(:disabled) {
   gap: 7px;
 }
 .budget-input > span {
-  font-size: 12px;
+  font-size: 13px;
   color: #858d76;
 }
 .budget-input input {
@@ -511,7 +511,7 @@ button:hover:not(:disabled) {
   min-width: 40px;
   border: 0;
   background: none;
-  font-size: 17px;
+  font-size: 18px;
   color: #4a5840;
   appearance: textfield;
 }
@@ -537,7 +537,7 @@ button:hover:not(:disabled) {
 .budget-choices button {
   border: 1px solid #e3e6da;
   border-radius: 5px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 0 12px;
   background: #fafbf7;
   color: #8c9480;
@@ -558,7 +558,7 @@ button:hover:not(:disabled) {
   display: flex;
   justify-content: space-between;
   margin-top: 14px;
-  font-size: 9px;
+  font-size: 10px;
   align-items: center;
 }
 .form-footer > span,
@@ -571,7 +571,7 @@ button:hover:not(:disabled) {
   color: #999f90;
 }
 .form-footer button {
-  font-size: 10px;
+  font-size: 11px;
   color: #657554;
   padding: 0;
 }
@@ -581,7 +581,7 @@ button:hover:not(:disabled) {
 .editorial-top {
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.8px;
   color: #8b947a;
   margin-bottom: 16px;
@@ -616,7 +616,7 @@ button:hover:not(:disabled) {
   color: #fffdf4;
 }
 .photo-caption > span {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.8;
   letter-spacing: 2px;
   color: #f1f0d0;
@@ -624,7 +624,7 @@ button:hover:not(:disabled) {
 }
 .photo-caption p {
   font-family: "Noto Serif SC", "SimSun", serif;
-  font-size: 31px;
+  font-size: 32px;
   line-height: 1.65;
   margin-top: 20px;
   letter-spacing: 2px;
@@ -639,7 +639,7 @@ button:hover:not(:disabled) {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   color: #e4e7d2;
   letter-spacing: 0.5px;
 }
@@ -657,14 +657,14 @@ button:hover:not(:disabled) {
   justify-content: center;
   flex-direction: column;
   text-align: center;
-  font-size: 8px;
+  font-size: 9px;
   line-height: 1;
   letter-spacing: 1px;
   transform: rotate(13deg);
   background: #59654722;
 }
 .round-stamp span {
-  font-size: 16px;
+  font-size: 17px;
   font-style: italic;
   font-family: Georgia, serif;
   line-height: 0.3;
@@ -686,12 +686,12 @@ button:hover:not(:disabled) {
 }
 .note-card h3 {
   font-family: "Noto Serif SC", "SimSun", serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   margin-bottom: 7px;
 }
 .note-card p {
-  font-size: 10px;
+  font-size: 11px;
   color: #96977c;
 }
 .note-line {
@@ -710,7 +710,7 @@ button:hover:not(:disabled) {
   gap: 12px;
   margin: 29px 0;
   color: #899275;
-  font-size: 10px;
+  font-size: 11px;
 }
 .mini-route > span {
   display: flex;
@@ -728,12 +728,12 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   border-top: 1px solid var(--line);
   padding-top: 18px;
-  font-size: 10px;
+  font-size: 11px;
   color: #a0a390;
   letter-spacing: 1px;
 }
 .little-star {
-  font-size: 27px;
+  font-size: 28px;
   color: #879775;
 }
 .footer {
@@ -744,14 +744,14 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   padding: 23px 0 27px;
   color: #8c9481;
-  font-size: 10px;
+  font-size: 11px;
 }
 .footer > span > span {
   color: #a9ad9e;
   margin-left: 9px;
 }
 .footer > span:last-child {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1.3px;
 }
 .wizard-page {
@@ -762,12 +762,12 @@ button:hover:not(:disabled) {
   gap: 80px;
 }
 .wizard-intro h1 {
-  font-size: 30px;
+  font-size: 31px;
   margin: 22px 0 15px;
   line-height: 1.7;
 }
 .wizard-intro > p {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 2;
   color: #8b927f;
 }
@@ -784,7 +784,7 @@ button:hover:not(:disabled) {
 }
 .person-art > span {
   font-family: Georgia;
-  font-size: 110px;
+  font-size: 111px;
   color: #779363;
   transform: rotate(8deg);
 }
@@ -802,7 +802,7 @@ button:hover:not(:disabled) {
   color: #b68b6c;
 }
 .context-note {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 2.2;
   color: #7e8c70;
 }
@@ -824,12 +824,12 @@ button:hover:not(:disabled) {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   margin-bottom: 17px;
 }
 .section-label small {
   color: #929b84;
-  font-size: 10px;
+  font-size: 11px;
 }
 .interest-grid {
   display: grid;
@@ -846,7 +846,7 @@ button:hover:not(:disabled) {
   gap: 9px;
   align-items: center;
   padding: 15px 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #858d78;
 }
 .interest-icon svg {
@@ -863,7 +863,7 @@ button:hover:not(:disabled) {
   position: absolute;
   right: 5px;
   top: 4px;
-  font-size: 8px;
+  font-size: 9px;
   background: #7a9066;
   color: #fff;
   width: 13px;
@@ -883,7 +883,7 @@ button:hover:not(:disabled) {
   align-items: center;
   border: 1px solid #e5e9db;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 10px;
   padding: 3px 4px;
   gap: 3px;
 }
@@ -909,7 +909,7 @@ button:hover:not(:disabled) {
 }
 .segmented button {
   flex: 1;
-  font-size: 10px;
+  font-size: 11px;
   padding: 8px 3px;
   white-space: nowrap;
   color: #939b86;
@@ -929,7 +929,7 @@ button:hover:not(:disabled) {
   border: 1px solid #e1e5d6;
   padding: 7px 10px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 11px;
   color: #919982;
   display: flex;
   gap: 4px;
@@ -953,7 +953,7 @@ textarea {
   background: #fafbf6;
   border-radius: 5px;
   padding: 12px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
   color: #59664d;
 }
@@ -999,12 +999,12 @@ textarea::placeholder {
   color: #8c9d79;
 }
 .handoff h1 {
-  font-size: 32px;
+  font-size: 33px;
   margin: 20px 0 15px;
 }
 .handoff > p {
   color: #929984;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 2;
   margin-bottom: 28px;
 }
@@ -1012,7 +1012,7 @@ textarea::placeholder {
   display: flex;
   gap: 6px;
   color: #a0a78e;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 20px;
 }
 .consensus-page {
@@ -1024,11 +1024,11 @@ textarea::placeholder {
   text-align: center;
 }
 .center-heading h1 {
-  font-size: 32px;
+  font-size: 33px;
   margin: 18px 0 12px;
 }
 .center-heading > p {
-  font-size: 12px;
+  font-size: 13px;
   color: #9a9f8e;
 }
 .consensus-grid {
@@ -1059,17 +1059,17 @@ textarea::placeholder {
   color: #b68f73;
 }
 .consensus-grid .eyebrow {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 1px;
   color: #9ca38d;
   margin-bottom: 9px;
 }
 .consensus-grid h2 {
-  font-size: 17px;
+  font-size: 18px;
   margin-bottom: 20px;
 }
 .consensus-grid p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.9;
   color: #949c87;
   margin-top: 20px;
@@ -1078,7 +1078,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: 12px;
   margin: 10px 0;
   color: #7e896f;
 }
@@ -1089,7 +1089,7 @@ textarea::placeholder {
   background: #e8eedf;
   display: inline-grid;
   place-items: center;
-  font-size: 9px;
+  font-size: 10px;
   border-radius: 50%;
 }
 .person-row:nth-last-of-type(1) > b {
@@ -1099,7 +1099,7 @@ textarea::placeholder {
   padding: 0;
   margin: 0;
   list-style: none;
-  font-size: 11px;
+  font-size: 12px;
   color: #7c896d;
   display: grid;
   gap: 13px;
@@ -1117,7 +1117,7 @@ textarea::placeholder {
   gap: 15px;
 }
 .consensus-actions > span {
-  font-size: 10px;
+  font-size: 11px;
   color: #9fa68f;
   display: flex;
   gap: 6px;
@@ -1131,10 +1131,10 @@ textarea::placeholder {
   display: flex;
   gap: 9px;
   color: #8a967a;
-  font-size: 10px;
+  font-size: 11px;
 }
 .edit-prefs button {
-  font-size: 10px;
+  font-size: 11px;
 }
 .compact .stepbar-inner {
   padding-top: 17px;
@@ -1152,11 +1152,11 @@ textarea::placeholder {
   gap: 15px;
 }
 .workbench-heading .eyebrow {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 2px;
 }
 .workbench-heading h1 {
-  font-size: 27px;
+  font-size: 28px;
   line-height: 1.6;
   letter-spacing: 0.5px;
   margin: 8px 0 8px;
@@ -1168,7 +1168,7 @@ textarea::placeholder {
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
   color: #8e9782;
 }
 .workbench-heading p i {
@@ -1184,7 +1184,7 @@ textarea::placeholder {
 }
 .workbench-buttons .button {
   min-height: 41px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 10px 16px;
 }
 .workbench-buttons .text-button {
@@ -1203,17 +1203,17 @@ textarea::placeholder {
   padding: 2px 0 8px;
 }
 .panel-title h2 {
-  font-size: 14px;
+  font-size: 15px;
 }
 .panel-title > span {
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 5px;
   border: 1px solid #e2e6d8;
   border-radius: 3px;
   color: #8c967a;
 }
 .panel-subtitle {
-  font-size: 10px;
+  font-size: 11px;
   color: #9da68e;
   margin-bottom: 18px;
 }
@@ -1246,7 +1246,7 @@ textarea::placeholder {
   color: #879b6d;
 }
 .candidate-art .plan-letter {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: #6e825a;
   align-self: flex-start;
@@ -1316,7 +1316,7 @@ textarea::placeholder {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 7px;
-  font-size: 8px;
+  font-size: 9px;
   color: #899972;
 }
 .candidate-label > span:first-child {
@@ -1342,12 +1342,12 @@ textarea::placeholder {
 }
 .candidate h3 {
   font-family: "Noto Serif SC", "SimSun", serif;
-  font-size: 15px;
+  font-size: 16px;
   margin-bottom: 7px;
   letter-spacing: 0.3px;
 }
 .candidate p {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.6;
   color: #9aa18e;
   white-space: normal;
@@ -1355,24 +1355,24 @@ textarea::placeholder {
 .candidate-stats {
   display: flex;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   margin-top: 15px;
   color: #8a957c;
   gap: 14px;
 }
 .candidate-stats > b {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: #647951;
 }
 .candidate-stats small {
-  font-size: 8px;
+  font-size: 9px;
   color: #9aa68b;
   font-weight: 400;
 }
 .candidate-stats .match {
   margin-left: auto;
-  font-size: 8px;
+  font-size: 9px;
   color: #879d6d;
 }
 .candidate-tip {
@@ -1386,11 +1386,11 @@ textarea::placeholder {
   margin-top: 3px;
 }
 .candidate-tip p {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.8;
 }
 .candidate-tip p > span {
-  font-size: 9px;
+  font-size: 10px;
   color: #afb69f;
 }
 .route-panel {
@@ -1408,16 +1408,16 @@ textarea::placeholder {
 }
 .route-heading h2 {
   font-family: "Noto Serif SC", "SimSun", serif;
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 500;
   margin-bottom: 7px;
 }
 .route-heading > div > span {
   color: #99a28c;
-  font-size: 9px;
+  font-size: 10px;
 }
 .route-heading .tag {
-  font-size: 8px;
+  font-size: 9px;
   padding: 5px 6px;
 }
 .route-metrics {
@@ -1446,12 +1446,12 @@ textarea::placeholder {
   gap: 4px;
 }
 .route-metrics b {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #61744f;
 }
 .route-metrics small {
-  font-size: 8px;
+  font-size: 9px;
   color: #9ca88b;
 }
 .map-shell {
@@ -1467,7 +1467,7 @@ textarea::placeholder {
   display: flex;
   justify-content: space-between;
   z-index: 1;
-  font-size: 9px;
+  font-size: 10px;
   pointer-events: none;
 }
 .map-top > span {
@@ -1503,7 +1503,7 @@ textarea::placeholder {
   gap: 5px;
 }
 .map-bottom > span {
-  font-size: 7px;
+  font-size: 8px;
   background: #fffef4d9;
   color: #8e9880;
   padding: 3px 5px;
@@ -1535,7 +1535,7 @@ textarea::placeholder {
   display: flex;
   gap: 5px;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   white-space: nowrap;
   color: #a4ad93;
   padding: 0;
@@ -1547,7 +1547,7 @@ textarea::placeholder {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  font-size: 9px;
+  font-size: 10px;
 }
 .stop-tabs button.selected {
   color: #617a4b;
@@ -1567,12 +1567,12 @@ textarea::placeholder {
   gap: 10px;
 }
 .stop-time {
-  font-size: 9px;
+  font-size: 10px;
   color: #96a181;
   letter-spacing: 0.3px;
 }
 .stop-heading h3 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   margin-top: 6px;
   display: flex;
@@ -1580,17 +1580,17 @@ textarea::placeholder {
   align-items: center;
 }
 .stop-heading > b {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   color: #6c8056;
 }
 .stop-heading small {
-  font-size: 8px;
+  font-size: 9px;
   color: #a4ad95;
   font-weight: 400;
 }
 .stop-detail > p {
-  font-size: 10px;
+  font-size: 11px;
   color: #959f88;
   line-height: 1.9;
   margin: 11px 0;
@@ -1602,12 +1602,12 @@ textarea::placeholder {
   flex-wrap: wrap;
 }
 .stop-tags > .tag {
-  font-size: 8px;
+  font-size: 9px;
   padding: 4px 6px;
 }
 .stop-tags > span:last-child {
   margin-left: auto;
-  font-size: 8px;
+  font-size: 9px;
   color: #b0b7a1;
 }
 .stop-actions {
@@ -1619,7 +1619,7 @@ textarea::placeholder {
 }
 .stop-actions > button {
   flex: 1;
-  font-size: 10px;
+  font-size: 11px;
   border: 1px solid #dfe5d2;
   border-radius: 4px;
   padding: 8px 5px;
@@ -1661,7 +1661,7 @@ textarea::placeholder {
   border-radius: 8px;
 }
 .trace-header h2 {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   margin-bottom: 6px;
 }
@@ -1669,11 +1669,11 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 8px;
+  font-size: 9px;
   color: #8d9c78;
 }
 .trace-count {
-  font-size: 8px;
+  font-size: 9px;
   color: #9eab8a;
   border: 1px solid #dfe6d2;
   padding: 3px 5px;
@@ -1682,7 +1682,7 @@ textarea::placeholder {
 }
 .agent-message {
   font-family: "Noto Serif SC", "SimSun", serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.9;
   color: #7f9068;
   letter-spacing: 0.5px;
@@ -1733,13 +1733,13 @@ textarea::placeholder {
   border-color: #d7e3c4;
 }
 .tool-event summary > span:nth-child(2) {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.7;
   color: #7a8a68;
 }
 .tool-event small {
   display: block;
-  font-size: 8px;
+  font-size: 9px;
   color: #a6b195;
 }
 .tool-event summary > svg {
@@ -1752,12 +1752,12 @@ textarea::placeholder {
 }
 .event-description {
   padding: 10px 0 0 27px;
-  font-size: 9px;
+  font-size: 10px;
   color: #97a286;
   line-height: 1.7;
 }
 .event-description code {
-  font-size: 9px;
+  font-size: 10px;
   color: #7e9369;
 }
 .event-description p {
@@ -1777,19 +1777,19 @@ textarea::placeholder {
   color: #9caa70;
 }
 .weather-card b {
-  font-size: 18px;
+  font-size: 19px;
   color: #788e5a;
   font-weight: 500;
 }
 .weather-card small {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   color: #9baa7f;
   margin-top: 2px;
 }
 .weather-card p {
-  font-size: 8px;
+  font-size: 9px;
   color: #acb697;
   margin-top: 10px;
 }
@@ -1798,7 +1798,7 @@ textarea::placeholder {
   padding-top: 17px;
 }
 .compromise h3 {
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   gap: 7px;
   align-items: center;
@@ -1806,7 +1806,7 @@ textarea::placeholder {
   color: #8b9b76;
 }
 .compromise p {
-  font-size: 9px;
+  font-size: 10px;
   color: #9aa78a;
   display: flex;
   gap: 8px;
@@ -1814,7 +1814,7 @@ textarea::placeholder {
   margin: 7px 0;
 }
 .compromise p > b {
-  font-size: 8px;
+  font-size: 9px;
   width: 19px;
   height: 19px;
 }
@@ -1824,13 +1824,13 @@ textarea::placeholder {
 }
 .compromise > small {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.8;
   color: #a8b296;
   margin-top: 12px;
 }
 .trace-footnote {
-  font-size: 8px;
+  font-size: 9px;
   color: #b4bda5;
   line-height: 1.9;
   border-top: 1px solid #e7ebdc;
@@ -1848,7 +1848,7 @@ textarea::placeholder {
   justify-content: space-between;
   gap: 10px;
   padding: 20px 0 25px;
-  font-size: 9px;
+  font-size: 10px;
   color: #a0aa90;
 }
 .workbench-bottom > span:first-child {
@@ -1870,7 +1870,7 @@ textarea::placeholder {
   gap: 7px;
   padding: 10px;
   background: #edf3e2;
-  font-size: 9px;
+  font-size: 10px;
   color: #7d9563;
   line-height: 1.8;
   margin-top: 12px;
@@ -1888,10 +1888,10 @@ textarea::placeholder {
   color: #a78a6e;
 }
 .constraint-warning b {
-  font-size: 12px;
+  font-size: 13px;
 }
 .constraint-warning p {
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 6px;
   line-height: 1.8;
 }
@@ -1899,7 +1899,7 @@ textarea::placeholder {
   margin-left: auto;
 }
 .inline-error {
-  font-size: 10px;
+  font-size: 11px;
   color: #ae8067;
   line-height: 1.8;
   margin: 10px 0;
@@ -1912,11 +1912,11 @@ textarea::placeholder {
   margin-bottom: 20px;
 }
 .final-page > h1 {
-  font-size: 32px;
+  font-size: 33px;
 }
 .final-page > p {
   color: #919d80;
-  font-size: 12px;
+  font-size: 13px;
 }
 .final-layout {
   display: grid;
@@ -1934,7 +1934,7 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
   color: #a1ad8a;
   padding-bottom: 22px;
@@ -1955,36 +1955,36 @@ textarea::placeholder {
   color: #7f9665;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 13px;
   flex-shrink: 0;
 }
 .final-stop > div {
   flex: 1;
 }
 .final-stop small {
-  font-size: 10px;
+  font-size: 11px;
   color: #9aa785;
 }
 .final-stop h3 {
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 17px;
+  font-size: 18px;
   margin: 7px 0 10px;
   font-family: "Noto Serif SC", serif;
   font-weight: 500;
 }
 .final-stop p {
-  font-size: 11px;
+  font-size: 12px;
   color: #a0a991;
   line-height: 1.9;
   margin-bottom: 11px;
 }
 .final-stop .tag {
-  font-size: 9px;
+  font-size: 10px;
 }
 .final-price {
-  font-size: 10px;
+  font-size: 11px;
   color: #9ba98a;
   margin-left: 10px;
 }
@@ -1994,7 +1994,7 @@ textarea::placeholder {
   align-items: center;
   gap: 7px;
   color: #adb89c;
-  font-size: 9px;
+  font-size: 10px;
   padding-top: 12px;
   border-top: 1px dashed #e5ebd8;
 }
@@ -2027,19 +2027,19 @@ textarea::placeholder {
 }
 .final-transit small {
   color: #9aa88f;
-  font-size: 9px;
+  font-size: 10px;
 }
 .final-transit h4 {
   margin: 4px 0 5px;
   color: #52684f;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.6;
 }
 .final-transit p {
   margin: 0;
   color: #8d9a84;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.7;
 }
 .final-summary {
@@ -2074,14 +2074,14 @@ textarea::placeholder {
 }
 .final-weather-heading small {
   color: #96a185;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.4px;
 }
 .final-weather-heading h2 {
   margin: 2px 0 0;
   color: #465d46;
   font-family: "Noto Serif SC", serif;
-  font-size: 27px;
+  font-size: 28px;
   font-weight: 500;
 }
 .final-weather-rain {
@@ -2090,7 +2090,7 @@ textarea::placeholder {
   gap: 7px;
   margin: 15px 0 12px;
   color: #718268;
-  font-size: 11px;
+  font-size: 12px;
 }
 .final-weather-meta {
   display: flex;
@@ -2099,7 +2099,7 @@ textarea::placeholder {
   padding-top: 11px;
   border-top: 1px solid #dde5d7;
   color: #93a08a;
-  font-size: 9px;
+  font-size: 10px;
 }
 .final-weather-meta span:last-child {
   color: #6d8168;
@@ -2107,13 +2107,13 @@ textarea::placeholder {
 }
 .final-summary h2 {
   font-family: "Noto Serif SC", serif;
-  font-size: 17px;
+  font-size: 18px;
   margin-bottom: 22px;
 }
 .final-summary > div {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: #96a185;
   margin-bottom: 13px;
 }
@@ -2128,11 +2128,11 @@ textarea::placeholder {
   align-items: center;
 }
 .summary-total > b {
-  font-size: 25px;
+  font-size: 26px;
   color: #627c4a;
 }
 .final-summary p {
-  font-size: 9px;
+  font-size: 10px;
   color: #a1ae8d;
 }
 .final-summary hr {
@@ -2154,7 +2154,7 @@ textarea::placeholder {
   margin: 0 0 16px;
   color: #52684f;
   font-family: "Noto Serif SC", serif;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
 }
 .final-cost-lines {
@@ -2178,19 +2178,19 @@ textarea::placeholder {
 .final-cost-line span {
   overflow: hidden;
   color: #627358;
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .final-cost-line small {
   margin-top: 3px;
   color: #a1aa96;
-  font-size: 8px;
+  font-size: 9px;
 }
 .final-cost-line b {
   flex-shrink: 0;
   color: #687e5d;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .final-cost-line.transport span {
@@ -2206,17 +2206,17 @@ textarea::placeholder {
   align-items: center;
   padding-top: 15px;
   color: #627358;
-  font-size: 11px;
+  font-size: 12px;
 }
 .final-cost-total b {
   color: #536d52;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 500;
 }
 .final-costs > p {
   margin-top: 13px;
   color: #a0aa94;
-  font-size: 8px;
+  font-size: 9px;
   line-height: 1.8;
 }
 .final-compromise {
@@ -2227,12 +2227,12 @@ textarea::placeholder {
   border-radius: 5px;
 }
 .final-compromise h3 {
-  font-size: 12px;
+  font-size: 13px;
   color: #7f9265;
   margin: 10px 0;
 }
 .final-compromise p {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.9;
 }
 .full-width {
@@ -2253,10 +2253,11 @@ textarea::placeholder {
   overflow: hidden;
 }
 .final-map .city-map {
-  height: 300px;
+  height: auto;
+  aspect-ratio: 680 / 490;
 }
 .final-disclaimer {
-  font-size: 9px !important;
+  font-size: 10px !important;
   line-height: 1.8;
   text-align: center;
   margin-top: 20px;
@@ -2291,19 +2292,19 @@ textarea::placeholder {
 }
 .modal h2 {
   font-family: "Noto Serif SC", serif;
-  font-size: 22px;
+  font-size: 23px;
   margin: 19px 0 13px;
   font-weight: 500;
   line-height: 1.6;
 }
 .modal > p {
-  font-size: 11px;
+  font-size: 12px;
   color: #96a084;
   line-height: 1.9;
   margin-bottom: 20px;
 }
 .modal ol {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 2.4;
   color: #8a9878;
   padding-left: 20px;
@@ -2321,7 +2322,7 @@ textarea::placeholder {
   padding: 14px;
   border-radius: 6px;
   color: #96a080;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.9;
   margin-bottom: 20px;
 }
@@ -2336,7 +2337,7 @@ textarea::placeholder {
   border: 1px solid #dce4cf;
   border-radius: 5px;
   color: #929e7e;
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -2350,7 +2351,7 @@ textarea::placeholder {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 14px;
   margin-bottom: 10px;
 }
@@ -2364,7 +2365,7 @@ textarea::placeholder {
   color: white;
   padding: 15px 23px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 13px;
   box-shadow: 0 6px 30px #23372626;
   display: flex;
   align-items: center;
@@ -2373,7 +2374,7 @@ textarea::placeholder {
   line-height: 1.8;
 }
 .muted {
-  font-size: 10px;
+  font-size: 11px;
   color: #a3ac95;
 }
 .spin {
@@ -2430,7 +2431,7 @@ textarea::placeholder {
     width: 44px;
   }
   .saved-indicator {
-    font-size: 8px;
+    font-size: 9px;
   }
   .workbench-grid {
     grid-template-columns: 220px minmax(0, 1fr) 220px;
@@ -2450,7 +2451,7 @@ textarea::placeholder {
     padding: 17px 16px;
   }
   .route-heading h2 {
-    font-size: 17px;
+    font-size: 18px;
   }
   .route-metrics {
     margin-left: 16px;
@@ -2463,7 +2464,7 @@ textarea::placeholder {
     width: 13px;
   }
   .route-metrics b {
-    font-size: 11px;
+    font-size: 12px;
   }
   .stop-tabs {
     padding-left: 13px;
@@ -2480,7 +2481,7 @@ textarea::placeholder {
     gap: 5px;
   }
   .stop-actions > button {
-    font-size: 9px;
+    font-size: 10px;
     gap: 4px;
   }
   .wizard-page {
@@ -2501,7 +2502,7 @@ textarea::placeholder {
     width: 94px;
   }
   .duration {
-    font-size: 8px;
+    font-size: 9px;
     padding: 4px 5px;
   }
 }
@@ -2530,7 +2531,7 @@ textarea::placeholder {
     gap: 35px;
   }
   .setup-left h1 {
-    font-size: 30px;
+    font-size: 31px;
   }
   .photo-frame {
     height: 485px;
@@ -2539,7 +2540,7 @@ textarea::placeholder {
     left: 25px;
   }
   .photo-caption p {
-    font-size: 25px;
+    font-size: 26px;
   }
   .budget-choices {
     gap: 4px;
@@ -2549,7 +2550,7 @@ textarea::placeholder {
   }
   .time-range input {
     width: 80px;
-    font-size: 12px;
+    font-size: 13px;
   }
   .time-range {
     padding: 0 9px;
@@ -2563,15 +2564,15 @@ textarea::placeholder {
     margin-right: 0;
   }
   .note-card h3 {
-    font-size: 12px;
+    font-size: 13px;
   }
   .note-card p {
-    font-size: 9px;
+    font-size: 10px;
     line-height: 1.7;
   }
   .mini-route {
     gap: 6px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .mini-route > i {
     width: 12px;
@@ -2616,16 +2617,16 @@ textarea::placeholder {
     padding-bottom: 13px;
   }
   .workbench-heading h1 {
-    font-size: 24px;
+    font-size: 25px;
   }
   .workbench-buttons {
     gap: 10px;
   }
   .workbench-buttons > .text-button {
-    font-size: 10px;
+    font-size: 11px;
   }
   .workbench-buttons .button {
-    font-size: 10px;
+    font-size: 11px;
     padding: 10px;
   }
   .candidate-stats {
@@ -2639,7 +2640,7 @@ textarea::placeholder {
     gap: 30px;
   }
   .wizard-intro h1 {
-    font-size: 24px;
+    font-size: 25px;
   }
   .preferences-card {
     padding: 23px;
@@ -2658,16 +2659,16 @@ textarea::placeholder {
     padding: 20px;
   }
   .consensus-grid h2 {
-    font-size: 15px;
+    font-size: 16px;
   }
   .consensus-grid p {
-    font-size: 10px;
+    font-size: 11px;
   }
   .consensus-page .center-heading h1 {
-    font-size: 28px;
+    font-size: 29px;
   }
   .footer > span:last-child {
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 0.8px;
   }
   .final-layout {
@@ -2689,11 +2690,11 @@ textarea::placeholder {
     padding: 0 20px;
   }
   .brand {
-    font-size: 21px;
+    font-size: 22px;
     gap: 9px;
   }
   .brand small {
-    font-size: 8px;
+    font-size: 9px;
     letter-spacing: 3px;
   }
   .brand-mark {
@@ -2713,13 +2714,13 @@ textarea::placeholder {
     display: none;
   }
   .demo-pill {
-    font-size: 8px;
+    font-size: 9px;
     padding: 4px 6px;
   }
   .avatar-pair span {
     width: 29px;
     height: 29px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .stepbar-inner {
     margin: 0;
@@ -2729,12 +2730,12 @@ textarea::placeholder {
   }
   .step {
     gap: 5px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .step > span {
     width: 19px;
     height: 19px;
-    font-size: 8px;
+    font-size: 9px;
   }
   .step-line {
     width: 10px;
@@ -2742,7 +2743,7 @@ textarea::placeholder {
     max-width: 18px;
   }
   .step label {
-    font-size: 9px;
+    font-size: 10px;
   }
   .setup-page {
     display: flex;
@@ -2751,16 +2752,16 @@ textarea::placeholder {
     gap: 38px;
   }
   .setup-left .eyebrow {
-    font-size: 8px;
+    font-size: 9px;
     letter-spacing: 1.6px;
   }
   .setup-left h1 {
-    font-size: 33px;
+    font-size: 34px;
     margin: 17px 0 16px;
     line-height: 1.7;
   }
   .intro {
-    font-size: 11px;
+    font-size: 12px;
   }
   .setup-form {
     margin-top: 26px;
@@ -2772,10 +2773,10 @@ textarea::placeholder {
     margin-bottom: 19px;
   }
   .field label {
-    font-size: 11px;
+    font-size: 12px;
   }
   .field label small {
-    font-size: 8px;
+    font-size: 9px;
   }
   .field-row {
     gap: 13px;
@@ -2788,7 +2789,7 @@ textarea::placeholder {
   }
   .fixed-input .en-label {
     display: inline;
-    font-size: 7px;
+    font-size: 8px;
   }
   .time-range {
     padding: 0 13px;
@@ -2796,10 +2797,10 @@ textarea::placeholder {
   }
   .time-range input {
     width: 94px;
-    font-size: 14px;
+    font-size: 15px;
   }
   .duration {
-    font-size: 9px;
+    font-size: 10px;
     padding: 5px 7px;
   }
   .budget-choices {
@@ -2812,11 +2813,11 @@ textarea::placeholder {
     min-height: 49px;
   }
   .form-footer {
-    font-size: 8px;
+    font-size: 9px;
     margin-top: 16px;
   }
   .form-footer button {
-    font-size: 9px;
+    font-size: 10px;
   }
   .weekend-editorial {
     max-width: 100%;
@@ -2833,32 +2834,32 @@ textarea::placeholder {
     left: 25px;
   }
   .photo-caption p {
-    font-size: 27px;
+    font-size: 28px;
     margin-top: 12px;
   }
   .photo-caption > span {
-    font-size: 8px;
+    font-size: 9px;
   }
   .round-stamp {
     width: 80px;
     height: 80px;
-    font-size: 7px;
+    font-size: 8px;
   }
   .round-stamp span {
-    font-size: 14px;
+    font-size: 15px;
   }
   .note-card {
     margin-top: 18px;
     margin-left: 8px;
   }
   .note-card h3 {
-    font-size: 14px;
+    font-size: 15px;
   }
   .note-card p {
-    font-size: 10px;
+    font-size: 11px;
   }
   .mini-route {
-    font-size: 10px;
+    font-size: 11px;
     gap: 13px;
     margin: 25px 0;
   }
@@ -2866,7 +2867,7 @@ textarea::placeholder {
     width: 15px;
   }
   .editorial-bottom {
-    font-size: 9px;
+    font-size: 10px;
   }
   .footer {
     margin-left: 22px;
@@ -2874,50 +2875,50 @@ textarea::placeholder {
     flex-direction: column;
     gap: 12px;
     padding: 20px 0;
-    font-size: 9px;
+    font-size: 10px;
   }
   .footer > span:last-child {
-    font-size: 7px;
+    font-size: 8px;
   }
   .wizard-page {
     display: block;
     margin: 30px 20px;
   }
   .wizard-intro h1 {
-    font-size: 27px;
+    font-size: 28px;
     margin: 17px 0 10px;
   }
   .wizard-intro > p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .person-art {
     display: none;
   }
   .context-note {
     margin: 18px 0 25px;
-    font-size: 10px;
+    font-size: 11px;
   }
   .context-note > br {
     display: none;
   }
   .context-note > span {
     margin-left: 10px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .preferences-card {
     padding: 20px 15px;
   }
   .section-label {
-    font-size: 11px;
+    font-size: 12px;
   }
   .section-label small {
-    font-size: 8px;
+    font-size: 9px;
   }
   .interest-grid {
     gap: 6px;
   }
   .interest {
-    font-size: 10px;
+    font-size: 11px;
     padding: 13px 0;
   }
   .interest-icon svg {
@@ -2927,18 +2928,18 @@ textarea::placeholder {
     gap: 4px;
   }
   .rank-list > div {
-    font-size: 8px;
+    font-size: 9px;
     padding: 4px;
   }
   .pref-columns {
     gap: 0;
   }
   .segmented button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 9px 4px;
   }
   .wizard-actions .button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 12px 13px;
   }
   .handoff {
@@ -2946,21 +2947,21 @@ textarea::placeholder {
     padding-top: 85px;
   }
   .handoff h1 {
-    font-size: 27px;
+    font-size: 28px;
   }
   .handoff p {
-    font-size: 12px;
+    font-size: 13px;
   }
   .consensus-page {
     margin: 35px 20px;
   }
   .center-heading h1,
   .consensus-page .center-heading h1 {
-    font-size: 25px;
+    font-size: 26px;
     margin: 20px 0 13px;
   }
   .center-heading > p {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.8;
   }
   .consensus-grid {
@@ -2977,11 +2978,11 @@ textarea::placeholder {
     margin-left: 10px;
   }
   .consensus-grid h2 {
-    font-size: 17px;
+    font-size: 18px;
     margin-bottom: 17px;
   }
   .consensus-grid p {
-    font-size: 11px;
+    font-size: 12px;
     margin-top: 16px;
   }
   .consensus-grid .eyebrow {
@@ -2990,7 +2991,7 @@ textarea::placeholder {
   }
   .consensus-actions .button {
     padding: 13px 15px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .workbench {
     margin: 25px 16px 0;
@@ -3000,15 +3001,15 @@ textarea::placeholder {
     margin-bottom: 22px;
   }
   .workbench-heading .eyebrow {
-    font-size: 7px;
+    font-size: 8px;
   }
   .workbench-heading h1 {
-    font-size: 25px;
+    font-size: 26px;
     letter-spacing: -0.5px;
     margin-top: 9px;
   }
   .workbench-heading p {
-    font-size: 8px;
+    font-size: 9px;
     gap: 6px;
     flex-wrap: wrap;
   }
@@ -3017,7 +3018,7 @@ textarea::placeholder {
     justify-content: space-between;
   }
   .workbench-buttons .button {
-    font-size: 10px;
+    font-size: 11px;
     min-height: 39px;
   }
   .workbench-grid {
@@ -3048,7 +3049,7 @@ textarea::placeholder {
     color: #8ca372;
   }
   .candidate-art .plan-letter {
-    font-size: 7px;
+    font-size: 8px;
     letter-spacing: 1px;
     margin: 0;
   }
@@ -3064,7 +3065,7 @@ textarea::placeholder {
     padding: 0;
   }
   .candidate-label {
-    font-size: 7px;
+    font-size: 8px;
     margin-bottom: 7px;
     gap: 1px;
   }
@@ -3080,7 +3081,7 @@ textarea::placeholder {
     height: 11px;
   }
   .candidate h3 {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.7;
     letter-spacing: 0;
     margin: 0;
@@ -3094,16 +3095,16 @@ textarea::placeholder {
     justify-content: space-between;
   }
   .candidate-stats > b {
-    font-size: 12px;
+    font-size: 13px;
   }
   .candidate-stats small {
-    font-size: 7px;
+    font-size: 8px;
   }
   .candidate-stats > span:not(.match) {
     display: none;
   }
   .candidate-stats .match {
-    font-size: 7px;
+    font-size: 8px;
   }
   .route-panel {
     width: 100%;
@@ -3113,13 +3114,13 @@ textarea::placeholder {
     padding: 16px 14px 13px;
   }
   .route-heading h2 {
-    font-size: 19px;
+    font-size: 20px;
   }
   .route-heading > div > span {
-    font-size: 8px;
+    font-size: 9px;
   }
   .route-heading .tag {
-    font-size: 7px;
+    font-size: 8px;
     gap: 3px;
   }
   .route-metrics {
@@ -3130,10 +3131,10 @@ textarea::placeholder {
     gap: 5px;
   }
   .route-metrics b {
-    font-size: 12px;
+    font-size: 13px;
   }
   .route-metrics small {
-    font-size: 7px;
+    font-size: 8px;
   }
   .route-metrics svg {
     width: 14px;
@@ -3150,13 +3151,13 @@ textarea::placeholder {
     top: 11px;
     left: 10px;
     right: 10px;
-    font-size: 8px;
+    font-size: 9px;
   }
   .map-top > span {
     padding: 5px 7px;
   }
   .map-bottom > span {
-    font-size: 6px;
+    font-size: 7px;
     max-width: 75%;
   }
   .map-bottom button {
@@ -3171,7 +3172,7 @@ textarea::placeholder {
     gap: 26px;
   }
   .mobile-drawer-tabs > button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 16px 0;
     color: #a0ac8b;
     position: relative;
@@ -3196,22 +3197,22 @@ textarea::placeholder {
     gap: 4px;
   }
   .stop-tabs > button {
-    font-size: 8px;
+    font-size: 9px;
     gap: 4px;
   }
   .stop-tabs > button > span {
     height: 17px;
     width: 17px;
-    font-size: 8px;
+    font-size: 9px;
   }
   .stop-detail {
     padding: 18px 16px;
   }
   .stop-heading h3 {
-    font-size: 16px;
+    font-size: 17px;
   }
   .stop-detail > p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .stop-actions {
     position: fixed;
@@ -3227,7 +3228,7 @@ textarea::placeholder {
     border-top: 1px solid #e0e6d1;
   }
   .stop-actions > button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 12px 5px;
   }
   .trace-panel {
@@ -3240,51 +3241,51 @@ textarea::placeholder {
     margin-bottom: 16px;
   }
   .trace-header h2 {
-    font-size: 14px;
+    font-size: 15px;
   }
   .trace-header small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .trace-count {
-    font-size: 10px;
+    font-size: 11px;
   }
   .agent-message {
     margin: 18px 0 24px;
-    font-size: 14px;
+    font-size: 15px;
   }
   .tool-event {
     padding-bottom: 19px;
   }
   .tool-event summary > span:nth-child(2) {
-    font-size: 12px;
+    font-size: 13px;
   }
   .tool-event small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .event-description {
-    font-size: 11px;
+    font-size: 12px;
   }
   .weather-card {
     margin: 10px 0 20px;
   }
   .weather-card p {
-    font-size: 9px;
-  }
-  .compromise h3 {
-    font-size: 13px;
-  }
-  .compromise p {
-    font-size: 11px;
-  }
-  .compromise small {
     font-size: 10px;
   }
+  .compromise h3 {
+    font-size: 14px;
+  }
+  .compromise p {
+    font-size: 12px;
+  }
+  .compromise small {
+    font-size: 11px;
+  }
   .trace-footnote {
-    font-size: 9px;
+    font-size: 10px;
   }
   .workbench-bottom {
     display: block;
-    font-size: 8px;
+    font-size: 9px;
     line-height: 1.9;
     padding: 17px 0 13px;
   }
@@ -3305,14 +3306,14 @@ textarea::placeholder {
     flex: 1;
   }
   .constraint-warning p {
-    font-size: 9px;
+    font-size: 10px;
   }
   .constraint-warning b {
-    font-size: 11px;
+    font-size: 12px;
   }
   .constraint-warning .button {
     min-height: 35px;
-    font-size: 10px;
+    font-size: 11px;
     padding: 8px 13px;
   }
   .final-page {
@@ -3330,40 +3331,40 @@ textarea::placeholder {
     gap: 13px;
   }
   .final-stop h3 {
-    font-size: 16px;
+    font-size: 17px;
   }
   .final-stop p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .final-map .city-map {
-    height: 300px;
+    height: auto;
   }
   .final-disclaimer {
-    font-size: 8px !important;
+    font-size: 9px !important;
   }
   .modal {
     padding: 28px 24px;
   }
   .modal h2 {
-    font-size: 21px;
+    font-size: 22px;
   }
   .toast {
     bottom: 85px;
     width: max-content;
-    font-size: 11px;
+    font-size: 12px;
     padding: 12px 16px;
   }
   .final-page > h1 {
-    font-size: 26px;
+    font-size: 27px;
   }
   .compact .stepbar-inner {
     padding: 17px 16px;
   }
   .compact .step {
-    font-size: 8px;
+    font-size: 9px;
   }
   .compact .step > label {
-    font-size: 8px;
+    font-size: 9px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -3377,16 +3378,16 @@ textarea::placeholder {
 
 /* Final visual QA adjustments: readable secondary content and mobile actions. */
 .intro {
-  font-size: 13px;
+  font-size: 14px;
 }
 .field label {
-  font-size: 12px;
+  font-size: 13px;
 }
 .select-wrap select {
-  font-size: 12px;
+  font-size: 13px;
 }
 .form-heading h2 {
-  font-size: 14px;
+  font-size: 15px;
 }
 .round-stamp {
   display: block;
@@ -3398,89 +3399,89 @@ textarea::placeholder {
   line-height: 1.4;
 }
 .panel-subtitle {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 .candidate h3 {
-  font-size: 16px;
+  font-size: 17px;
 }
 .candidate p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 .candidate-label {
-  font-size: 10px;
+  font-size: 11px;
 }
 .candidate-stats,
 .candidate-stats .match {
-  font-size: 10px;
+  font-size: 11px;
 }
 .candidate-stats small {
-  font-size: 9px;
+  font-size: 10px;
 }
 .candidate-body {
   padding: 14px 15px 16px;
 }
 .candidate-tip p {
-  font-size: 11px;
+  font-size: 12px;
 }
 .candidate-tip p > span {
-  font-size: 10px;
+  font-size: 11px;
 }
 .stop-detail > p {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.9;
 }
 .stop-actions > button {
-  font-size: 11px;
-}
-.stop-tabs button {
-  font-size: 10px;
-}
-.stop-time {
-  font-size: 11px;
-}
-.stop-tags > .tag {
-  font-size: 10px;
-}
-.tool-event summary > span:nth-child(2) {
   font-size: 12px;
 }
-.tool-event small {
-  font-size: 10px;
-}
-.event-description {
+.stop-tabs button {
   font-size: 11px;
 }
-.trace-header h2 {
+.stop-time {
+  font-size: 12px;
+}
+.stop-tags > .tag {
+  font-size: 11px;
+}
+.tool-event summary > span:nth-child(2) {
   font-size: 13px;
 }
-.compromise p {
+.tool-event small {
   font-size: 11px;
+}
+.event-description {
+  font-size: 12px;
+}
+.trace-header h2 {
+  font-size: 14px;
+}
+.compromise p {
+  font-size: 12px;
 }
 .compromise > small {
-  font-size: 11px;
+  font-size: 12px;
 }
 .trace-footnote {
-  font-size: 9px;
+  font-size: 10px;
 }
 .weather-card p {
-  font-size: 9px;
+  font-size: 10px;
 }
 .route-heading > div > span {
-  font-size: 11px;
+  font-size: 12px;
 }
 .route-metrics small {
-  font-size: 10px;
-}
-.route-heading .tag {
-  font-size: 9px;
-}
-.workbench-heading p {
   font-size: 11px;
 }
-.workbench-bottom {
+.route-heading .tag {
   font-size: 10px;
+}
+.workbench-heading p {
+  font-size: 12px;
+}
+.workbench-bottom {
+  font-size: 11px;
 }
 .stop-detail > p,
 .candidate p,
@@ -3496,93 +3497,93 @@ textarea::placeholder {
 }
 @media (max-width: 1250px) and (min-width: 761px) {
   .candidate h3 {
-    font-size: 14px;
+    font-size: 15px;
   }
   .candidate p {
-    font-size: 10px;
+    font-size: 11px;
   }
   .candidate-stats,
   .candidate-stats .match {
-    font-size: 9px;
+    font-size: 10px;
   }
   .tool-event summary > span:nth-child(2) {
-    font-size: 11px;
+    font-size: 12px;
   }
   .stop-actions > button {
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 @media (max-width: 760px) {
   .intro {
-    font-size: 12px;
-  }
-  .field label {
-    font-size: 12px;
-  }
-  .form-heading h2 {
     font-size: 13px;
   }
+  .field label {
+    font-size: 13px;
+  }
+  .form-heading h2 {
+    font-size: 14px;
+  }
   .candidate h3 {
-    font-size: 12px;
+    font-size: 13px;
   }
   .candidate-body {
     padding: 0;
   }
   .candidate-label {
-    font-size: 8px;
+    font-size: 9px;
   }
   .candidate-stats .match {
-    font-size: 8px;
+    font-size: 9px;
   }
   .candidate-stats small {
-    font-size: 8px;
+    font-size: 9px;
   }
   .candidate-stats {
     gap: 2px;
   }
   .candidate-stats > b {
-    font-size: 12px;
+    font-size: 13px;
   }
   .stop-actions > button {
     white-space: nowrap;
     min-height: 44px;
-    font-size: 11px;
-  }
-  .stop-tabs button {
-    font-size: 9px;
-  }
-  .stop-detail > p {
     font-size: 12px;
   }
+  .stop-tabs button {
+    font-size: 10px;
+  }
+  .stop-detail > p {
+    font-size: 13px;
+  }
   .stop-tags > .tag {
-    font-size: 9px;
+    font-size: 10px;
   }
   .route-heading > div > span {
-    font-size: 9px;
+    font-size: 10px;
   }
   .route-metrics small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .route-heading .tag {
-    font-size: 8px;
+    font-size: 9px;
   }
   .workbench-heading p {
-    font-size: 9px;
+    font-size: 10px;
   }
   .workbench-bottom {
-    font-size: 9px;
+    font-size: 10px;
   }
   .round-stamp {
     padding-top: 15px;
   }
   .step label,
   .compact .step > label {
-    font-size: 9px;
+    font-size: 10px;
   }
   .trace-footnote {
-    font-size: 10px;
+    font-size: 11px;
   }
   .weather-card p {
-    font-size: 10px;
+    font-size: 11px;
   }
 }

@@ -12,6 +12,7 @@ import {
 import type { AgentEvent } from "@/contracts/agent";
 import type { GroupView } from "@/contracts/groups";
 import { RouteMap } from "@/components/RouteMap";
+import { Modal } from "@/components/Ui";
 import { FinalItinerary } from "@/features/final/FinalItinerary";
 import { groupClient } from "./client";
 
@@ -287,7 +288,7 @@ export function GroupResults({
                         {stop.name}
                       </button>
                       <button
-                        className="text-button"
+                        className="text-button group-change-place"
                         disabled={
                           !editable ||
                           group.replanCount >= 2 ||
@@ -298,7 +299,7 @@ export function GroupResults({
                           setReason("");
                         }}
                       >
-                        换个地方 {stop.name}
+                        换个地方：{stop.name}
                       </button>
                     </div>
                   )}
@@ -308,6 +309,8 @@ export function GroupResults({
             <RouteMap plan={selected} />
           </div>
           {group.canManage && rejectedStopId && (
+            <Modal title={`换个地方：${selected.stops.find((stop) => stop.id === rejectedStopId)?.name ?? "当前站点"}`} onClose={() => setRejected("")}>
+            <p>只调整这一站，保留已锁定的安排。请告诉我们想换个地方的原因。</p>
             <form
               className="group-replan"
               onSubmit={async (e) => {
@@ -354,6 +357,7 @@ export function GroupResults({
                 取消调整
               </button>
             </form>
+            </Modal>
           )}
           {group.canManage && (
             <button
