@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -15,6 +15,7 @@ import { dateLabel } from "@/components/Ui";
 import { PreferenceStep } from "@/features/wizard/PreferenceStep";
 import { GroupCreate } from "./GroupCreate";
 import { GroupResults, type GroupMutation } from "./GroupResults";
+import { GroupTrace } from "./GroupTrace";
 import { groupClient } from "./client";
 
 const states = {
@@ -43,6 +44,8 @@ export function GroupLobby({
   handoff,
   inviteAvailable,
   expired,
+  preferencePage,
+  onPreferencePage,
 }: {
   group: GroupView;
   memberId: string;
@@ -53,9 +56,19 @@ export function GroupLobby({
   handoff: () => void;
   inviteAvailable: boolean;
   expired: boolean;
+  preferencePage: boolean;
+  onPreferencePage: (value: boolean, replace?: boolean) => void;
 }) {
   const mine = group.myMembers.find((m) => m.id === memberId);
-  const [editing, setEditing] = useState(false);
+  const preferenceRoot = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!preferencePage) return;
+    const heading = preferenceRoot.current?.querySelector("h1");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+  }, [preferencePage]);
   const [round, setRound] = useState(false);
   const [base, setBase] = useState(() => ({
     version: mine?.version ?? 0,
@@ -81,7 +94,7 @@ export function GroupLobby({
       }),
     );
     if (saved) {
-      setEditing(false);
+      onPreferencePage(false, true);
       setDirty(false);
       setConflict(false);
     } else setConflict(true);
@@ -91,7 +104,7 @@ export function GroupLobby({
     setDirty(false);
     setConflict(false);
     setFormSeed((s) => s + 1);
-    setEditing(true);
+    onPreferencePage(true);
   }
   async function sync() {
     let latest: GroupView | undefined;
@@ -111,6 +124,25 @@ export function GroupLobby({
       setFormSeed((s) => s + 1);
     }
   }
+  if (preferencePage && canEdit) return (
+    <div ref={preferenceRoot} className="group-preference-page" aria-label="独立偏好填写页">
+      <div className="group-preference-heading">
+        <div><span className="group-kicker"><ShieldCheck size={14} /> 我的独立偏好</span><p>{group.name} · 第 {group.revision} 轮</p></div>
+        {group.myMembers.length > 1 && <label>当前填写身份<select value={memberId} onChange={(e) => onMember(e.target.value)}>{group.myMembers.map((m) => <option key={m.id} value={m.id}>{m.nickname}</option>)}</select></label>}
+      </div>
+      <p className="group-form-state">{dirty ? "有尚未保存的编辑" : "仅显示当前身份的草稿"}{mine?.preferences && " · 草稿来自本人服务器记录"}</p>
+      <PreferenceStep
+        key={`${group.id}:${memberId}:${group.revision}:${formSeed}`}
+        person={mine!.nickname}
+        headcount={group.targetCount}
+        setup={group.setup}
+        initial={base.preferences}
+        onBack={() => onPreferencePage(false)}
+        onSubmit={(p) => save(p, true)}
+        groupControls={{ busy, onDirty: () => setDirty(true), onSaveDraft: (p) => save(p, false), changed: mine!.version !== base.version || conflict, onSync: sync }}
+      />
+    </div>
+  );
   return (
     <>
       <div className="group-lobby">
@@ -335,36 +367,15 @@ export function GroupLobby({
           }}
         />
       )}
-      {editing && canEdit && (
-        <>
-          <p className="group-form-state">
-            {dirty ? "有尚未保存的编辑" : "仅显示当前身份的草稿"}
-            {mine?.preferences && " · 草稿来自本人服务器记录"}
-          </p>
-          <PreferenceStep
-            key={`${group.id}:${memberId}:${group.revision}:${formSeed}`}
-            person={mine!.nickname}
-            headcount={group.targetCount}
-            setup={group.setup}
-            initial={base.preferences}
-            onBack={() => setEditing(false)}
-            onSubmit={(p) => save(p, true)}
-            groupControls={{
-              busy,
-              onDirty: () => setDirty(true),
-              onSaveDraft: (p) => save(p, false),
-              changed: mine!.version !== base.version || conflict,
-              onSync: sync,
-            }}
-          />
-        </>
-      )}
+      <div className={group.job ? "group-workspace" : undefined}>
       <GroupResults
         key={`${group.selectedPlanId ?? ""}:${group.job?.id ?? ""}`}
         group={group}
         busy={busy || expired}
         mutate={mutate}
       />
+      {group.job && <GroupTrace group={group} />}
+      </div>
     </>
   );
 }

@@ -16,6 +16,94 @@ const preferences = {
   avoid: [],
   wish: "我的服务器草稿",
 };
+
+it("opens a dedicated preference page and returns to the lobby", async () => {
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.click(await screen.findByRole("button", { name: "打开 梧桐周末" }));
+  await user.click(screen.getByRole("button", { name: "填写我的偏好" }));
+  expect(location.hash).toBe("#group=g1&view=preferences&member=m1");
+  expect(screen.getByRole("heading", { name: "小林 的周末偏好" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("参与席位")).not.toBeInTheDocument();
+  expect(screen.queryByRole("complementary", { name: "Agent 轨迹侧栏" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "返回大厅" }));
+  expect(location.hash).toBe("#group=g1");
+  expect(screen.getByLabelText("参与席位")).toBeInTheDocument();
+});
+
+it("restores an authorized preference page from its URL after reload", async () => {
+  current = group({ myMembers: [{ ...current.myMembers[0], preferences: { ...preferences, interests: ["咖啡"] } }] });
+  history.replaceState(null, "", "/#group=g1&view=preferences&member=m1");
+  render(<GroupApp />);
+  expect(await screen.findByLabelText("一句话愿望（可选）")).toHaveValue("我的服务器草稿");
+  expect(screen.queryByLabelText("参与席位")).not.toBeInTheDocument();
+});
+
+it("does not open another member's preference page from an untrusted URL", async () => {
+  history.replaceState(null, "", "/#group=g1&view=preferences&member=someone-else");
+  render(<GroupApp />);
+  expect(await screen.findByLabelText("参与席位")).toBeInTheDocument();
+  expect(screen.queryByLabelText("一句话愿望（可选）")).not.toBeInTheDocument();
+});
+
+it("shows the persisted trace in a sidebar with an expandable compact view", async () => {
+  const media = { matches: true, addEventListener: vi.fn((_event: string, _callback: () => void) => {}), removeEventListener: vi.fn() };
+  vi.stubGlobal("matchMedia", vi.fn(() => media));
+  const events = createDemoRun({ runId: "sidebar" });
+  current = group({ state: "ready", candidates: getCandidates(events), job: { id: "j", kind: "plan", state: "succeeded", attempt: 1, plans: getCandidates(events), events: events.map((event, i) => ({ sequence: i + 1, event })) } });
+  groups = [current];
+  const user = userEvent.setup();
+  render(<GroupApp />);
+  await user.click(await screen.findByRole("button", { name: "打开 梧桐周末" }));
+  const sidebar = screen.getByRole("complementary", { name: "Agent 轨迹侧栏" });
+  expect(within(sidebar).getByLabelText("持久规划事件")).toBeInTheDocument();
+  const toggle = within(sidebar).getByRole("button", { name: "收起 Agent 轨迹" });
+  expect(within(sidebar).getAllByRole("button")).toHaveLength(1);
+  expect(toggle).toHaveAttribute("title", "收起 Agent 轨迹");
+  expect(toggle.textContent).toBe("");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(toggle).toHaveAttribute("title", "展开 Agent 轨迹");
+  const update = media.addEventListener.mock.calls[0][1];
+  act(() => { media.matches = false; update(); });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(within(sidebar).getAllByRole("button")).toHaveLength(1);
+  act(() => { media.matches = true; update(); });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(within(sidebar).getByText(/Open-Meteo demo fixture/)).toBeInTheDocument();
+});
+
+it.each(["mobile", "desktop", "failed", "reduced-motion"])("scrolls to a selected plan only after a successful mobile selection: %s", async (mode) => {
+  const candidates = getCandidates(createDemoRun({ runId: "scroll" }));
+  current = group({ state: "ready", candidates });
+  groups = [current];
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({ matches: query.includes("max-width") ? mode !== "desktop" : mode === "reduced-motion" })));
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => { frames.push(callback); return frames.length; }));
+  const scroll = vi.fn();
+  const originalScroll = HTMLElement.prototype.scrollIntoView;
+  HTMLElement.prototype.scrollIntoView = scroll;
+  try {
+    const user = userEvent.setup();
+    render(<GroupApp />);
+    await user.click(await screen.findByRole("button", { name: "打开 梧桐周末" }));
+    if (mode === "failed") {
+      const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+      vi.mocked(fetch).mockImplementation((path, options) => path.endsWith("/select") ? Promise.resolve(Response.json({ error: { code: "VERSION_CONFLICT", message: "内容已更新" } }, { status: 409 })) : originalFetch(path, options));
+    }
+    await user.click(screen.getByRole("button", { name: `选择方案 ${candidates[1].title}` }));
+    await act(async () => { frames.forEach((frame) => frame(0)); });
+    if (mode === "mobile" || mode === "reduced-motion") {
+      expect(scroll).toHaveBeenCalledOnce();
+      expect(scroll.mock.instances[0]).toBe(document.querySelector(".group-selected"));
+      expect(scroll).toHaveBeenCalledWith({ behavior: mode === "reduced-motion" ? "auto" : "smooth", block: "start" });
+    } else expect(scroll).not.toHaveBeenCalled();
+  } finally { HTMLElement.prototype.scrollIntoView = originalScroll; }
+});
 function group(overrides: Partial<GroupView> = {}): GroupView {
   return {
     id: "g1",

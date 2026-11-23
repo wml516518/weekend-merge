@@ -748,10 +748,10 @@ button:hover:not(:disabled) {
 }
 .footer > span > span {
   color: #a9ad9e;
-  margin-left: 9px;
+  margin-left: 11px;
 }
 .footer > span:last-child {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.3px;
 }
 .wizard-page {
@@ -2668,7 +2668,7 @@ textarea::placeholder {
     font-size: 29px;
   }
   .footer > span:last-child {
-    font-size: 8px;
+    font-size: 10px;
     letter-spacing: 0.8px;
   }
   .final-layout {
@@ -2878,7 +2878,7 @@ textarea::placeholder {
     font-size: 10px;
   }
   .footer > span:last-child {
-    font-size: 8px;
+    font-size: 10px;
   }
   .wizard-page {
     display: block;

@@ -7,44 +7,13 @@ import {
   Sparkles,
   UsersRound,
   WalletCards,
-  WandSparkles,
 } from "lucide-react";
-import type { AgentEvent } from "@/contracts/agent";
 import type { GroupView } from "@/contracts/groups";
 import { RouteMap } from "@/components/RouteMap";
 import { Modal } from "@/components/Ui";
 import { FinalItinerary } from "@/features/final/FinalItinerary";
 import { groupClient } from "./client";
 
-const stepNames: Record<string, string> = {
-  VALIDATE: "核对共同条件",
-  ANALYZE: "分析成员兴趣支持",
-  GATHER: "查询地点与出行资料",
-  PROPOSE: "组合三个方案",
-  VERIFY: "核对预算和路线",
-  REPLAN: "调整选中方案",
-  FINALIZE: "完成规划",
-};
-function eventText(event: AgentEvent) {
-  switch (event.type) {
-    case "run.started":
-      return "本次规划已开始";
-    case "step.started":
-      return stepNames[event.step] ?? event.step;
-    case "tool.completed":
-      return `${event.tool} · 来源 ${event.source} · ${event.durationMs} ms`;
-    case "tool.failed":
-      return `${event.tool} 查询未完成 · ${event.code}`;
-    case "run.degraded":
-      return `当前使用降级结果 · ${event.fallback} · ${event.reason}`;
-    case "plan.proposed":
-      return `已生成提案：${event.plan.title}`;
-    case "run.completed":
-      return "本次规划已完成";
-    case "run.failed":
-      return `规划失败：${event.message}`;
-  }
-}
 export type GroupMutation = (
   operation: () => Promise<GroupView>,
 ) => Promise<boolean>;
@@ -78,39 +47,9 @@ export function GroupResults({
       地点来自静态上海精选目录，营业时间与票价须出发前核实；路线、步行距离和费用为估算，非实时导航。
     </p>
   );
-  const events = group.job && (
-    <section className="group-events" aria-label="持久规划事件">
-      <div className="group-section-heading">
-        <div>
-          <span className="group-kicker"><WandSparkles size={14} /> Agent 轨迹</span>
-          <h2>一起等一个好周末</h2>
-        </div>
-        <span className="group-attempt">
-          第 {group.job.attempt} 次 · {group.job.kind === "replan" ? "局部调整" : "完整规划"}
-        </span>
-      </div>
-      <ol>
-        {group.job.events.map(({ sequence, event }) => (
-          <li key={sequence}>
-            <span className="group-event-dot"><Check size={12} /></span>
-            <div>
-              <p>{eventText(event)}</p>
-              {event.type === "tool.completed" && (
-                <details>
-                  <summary>查看工具依据</summary>
-                  <pre>{JSON.stringify(event.summary, null, 2)}</pre>
-                </details>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
   if (group.state === "finalized" && final)
     return (
       <section className="group-results">
-        {events}
         {catalogDisclosure}
         <FinalItinerary
           plan={{
@@ -129,7 +68,13 @@ export function GroupResults({
     );
   return (
     <section className="group-results" aria-label="共同规划结果">
-      {events}
+      {(group.state === "queued" || group.state === "running") && (
+        <section className="group-consensus" role="status">
+          <span className="group-kicker"><Sparkles size={14} /> 共同规划中</span>
+          <h2>{group.state === "queued" ? "期待已到齐，等待开始" : "正在为大家安排这个周末"}</h2>
+          <p>规划完成后会在这里展示候选方案，过程与工具依据可在 Agent 轨迹中查看。</p>
+        </section>
+      )}
       {group.state === "failed" && (
         <div className="group-notice" role="status">
           <p>
@@ -218,15 +163,21 @@ export function GroupResults({
                   <button
                     className="button secondary"
                     disabled={!editable}
-                    onClick={() =>
-                      mutate(() =>
+                    onClick={async () => {
+                      const saved = await mutate(() =>
                         groupClient.select(group.id, {
                           version: group.stateVersion,
                           planId: plan.id,
                           lockedStopIds: [],
                         }),
-                      )
-                    }
+                      );
+                      if (saved && window.matchMedia?.("(max-width: 1100px)").matches) {
+                        requestAnimationFrame(() => document.getElementById(`group-selected-${group.id}`)?.scrollIntoView({
+                          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+                          block: "start",
+                        }));
+                      }
+                    }}
                   >
                     选择方案 {plan.title}
                   </button>
@@ -237,7 +188,7 @@ export function GroupResults({
         </>
       )}
       {selected && (
-        <section className="group-selected">
+        <section id={`group-selected-${group.id}`} className="group-selected">
           <div className="group-selected-heading">
             <span className="group-icon-box"><Check size={19} /></span>
             <div>

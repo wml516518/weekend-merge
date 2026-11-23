@@ -25,6 +25,10 @@ function readEntry(): Entry {
   }
   return null;
 }
+function readPreferenceMember() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  return params.get("view") === "preferences" ? params.get("member") ?? "" : "";
+}
 type IssuedLinks = {
   invite?: string;
   inviteRevision?: number;
@@ -49,7 +53,8 @@ export function GroupApp() {
   const activeRef = useRef(activeId);
   activeRef.current = activeId;
   const [group, setGroup] = useState<GroupView>();
-  const [memberId, setMember] = useState("");
+  const [memberId, setMember] = useState(readPreferenceMember);
+  const [preferencePage, setPreferencePage] = useState(() => !!readPreferenceMember());
   const [error, setError] = useState("");
   const [pollError, setPollError] = useState("");
   const [message, setMessage] = useState("");
@@ -110,6 +115,7 @@ export function GroupApp() {
     setBusy(false);
   }
   function home() {
+    setPreferencePage(false);
     leaveContext();
     activeRef.current = "";
     setActiveId("");
@@ -121,6 +127,7 @@ export function GroupApp() {
     void loadList();
   }
   function open(value: GroupView, ownMemberId?: string) {
+    setPreferencePage(false);
     leaveContext();
     activeRef.current = value.id;
     setActiveId(value.id);
@@ -153,6 +160,12 @@ export function GroupApp() {
   useEffect(() => {
     const listener = () => {
       const next = readEntry();
+      setPreferencePage(!!readPreferenceMember());
+      if (next?.kind === "group" && next.token === activeRef.current) {
+        const requested = readPreferenceMember();
+        if (requested) setMember(requested);
+        return;
+      }
       leaveContext();
       setEntry(next);
       if (next?.kind === "group") {
@@ -196,6 +209,9 @@ export function GroupApp() {
           requestVersion.current === version
         ) {
           setGroup(value);
+          const requested = readPreferenceMember();
+          if (requested && !value.myMembers.some((m) => m.id === requested))
+            setPreferencePage(false);
           setPollError("");
           setMember((old) =>
             value.myMembers.some((m) => m.id === old)
@@ -322,6 +338,16 @@ export function GroupApp() {
     }));
   }
   const links = group ? (issued[group.id] ?? {}) : {};
+  function showPreferences(value: boolean, replace = false) {
+    const params = new URLSearchParams({ group: activeId });
+    if (value) { params.set("view", "preferences"); params.set("member", memberId); }
+    const url = `${location.pathname}${location.search}#${params}`;
+    if (replace) history.replaceState(null, "", url);
+    else history.pushState(null, "", url);
+    setPreferencePage(value);
+  }
+  const editingPreferences = preferencePage && group?.state === "collecting" &&
+    Date.now() < group.expiresAt && group.myMembers.some((m) => m.id === memberId);
   const inviteValid =
     !!group &&
     group.state === "collecting" &&
@@ -495,7 +521,9 @@ export function GroupApp() {
               key={`${group.id}:${memberId}:${group.revision}`}
               group={group}
               memberId={memberId}
-              onMember={setMember}
+              onMember={(id) => { showPreferences(false, true); setMember(id); }}
+              preferencePage={!!editingPreferences}
+              onPreferencePage={showPreferences}
               busy={busy || loading}
               mutate={mutate}
               expired={Date.now() >= group.expiresAt}
@@ -516,7 +544,7 @@ export function GroupApp() {
                 })
               }
             />
-            {(links.invite || links.personal?.[memberId] || links.owner) && (
+            {!editingPreferences && (links.invite || links.personal?.[memberId] || links.owner) && (
               <section className="group-links" aria-label="邀请与恢复链接">
                 <div className="group-links-heading">
                   <span className="group-icon-box">
