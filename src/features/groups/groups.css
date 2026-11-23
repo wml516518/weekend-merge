@@ -1082,6 +1082,8 @@
 }
 
 .group-shell .final-page {
+  width: 100%;
+  max-width: none;
   margin: 24px 0 0;
 }
 
