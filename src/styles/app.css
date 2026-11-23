@@ -2253,8 +2253,7 @@ textarea::placeholder {
   overflow: hidden;
 }
 .final-map .city-map {
-  height: auto;
-  aspect-ratio: 680 / 490;
+  height: 300px;
 }
 .final-disclaimer {
   font-size: 10px !important;
@@ -3337,7 +3336,7 @@ textarea::placeholder {
     font-size: 12px;
   }
   .final-map .city-map {
-    height: auto;
+    height: 300px;
   }
   .final-disclaimer {
     font-size: 10px !important;
