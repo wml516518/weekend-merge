@@ -173,7 +173,7 @@
   }
   .step label,
   .compact .step > label {
-    font-size: 9px;
+    font-size: 10px;
   }
   .candidate-title {
     font-size: 13px;
@@ -203,7 +203,7 @@
   .step > span {
     width: 18px;
     height: 18px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .header {
     padding-left: 16px;

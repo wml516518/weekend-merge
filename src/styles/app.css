@@ -434,13 +434,13 @@ button:hover:not(:disabled) {
   font-size: 13px;
 }
 .fixed-input .tag {
-  font-size: 9px;
+  font-size: 10px;
   padding: 3px 5px;
   background: #f0f1e9;
   color: #939781;
 }
 .en-label {
-  font-size: 9px;
+  font-size: 10px;
   color: #9ba08d;
   margin-left: 3px;
 }
@@ -581,7 +581,7 @@ button:hover:not(:disabled) {
 .editorial-top {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.8px;
   color: #8b947a;
   margin-bottom: 16px;
@@ -657,7 +657,7 @@ button:hover:not(:disabled) {
   justify-content: center;
   flex-direction: column;
   text-align: center;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1;
   letter-spacing: 1px;
   transform: rotate(13deg);
@@ -751,7 +751,7 @@ button:hover:not(:disabled) {
   margin-left: 9px;
 }
 .footer > span:last-child {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.3px;
 }
 .wizard-page {
@@ -863,7 +863,7 @@ button:hover:not(:disabled) {
   position: absolute;
   right: 5px;
   top: 4px;
-  font-size: 9px;
+  font-size: 10px;
   background: #7a9066;
   color: #fff;
   width: 13px;
@@ -1059,7 +1059,7 @@ textarea::placeholder {
   color: #b68f73;
 }
 .consensus-grid .eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1px;
   color: #9ca38d;
   margin-bottom: 9px;
@@ -1152,7 +1152,7 @@ textarea::placeholder {
   gap: 15px;
 }
 .workbench-heading .eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2px;
 }
 .workbench-heading h1 {
@@ -1316,7 +1316,7 @@ textarea::placeholder {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 7px;
-  font-size: 9px;
+  font-size: 10px;
   color: #899972;
 }
 .candidate-label > span:first-child {
@@ -1366,13 +1366,13 @@ textarea::placeholder {
   color: #647951;
 }
 .candidate-stats small {
-  font-size: 9px;
+  font-size: 10px;
   color: #9aa68b;
   font-weight: 400;
 }
 .candidate-stats .match {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 10px;
   color: #879d6d;
 }
 .candidate-tip {
@@ -1417,7 +1417,7 @@ textarea::placeholder {
   font-size: 10px;
 }
 .route-heading .tag {
-  font-size: 9px;
+  font-size: 10px;
   padding: 5px 6px;
 }
 .route-metrics {
@@ -1451,7 +1451,7 @@ textarea::placeholder {
   color: #61744f;
 }
 .route-metrics small {
-  font-size: 9px;
+  font-size: 10px;
   color: #9ca88b;
 }
 .map-shell {
@@ -1585,7 +1585,7 @@ textarea::placeholder {
   color: #6c8056;
 }
 .stop-heading small {
-  font-size: 9px;
+  font-size: 10px;
   color: #a4ad95;
   font-weight: 400;
 }
@@ -1602,12 +1602,12 @@ textarea::placeholder {
   flex-wrap: wrap;
 }
 .stop-tags > .tag {
-  font-size: 9px;
+  font-size: 10px;
   padding: 4px 6px;
 }
 .stop-tags > span:last-child {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 10px;
   color: #b0b7a1;
 }
 .stop-actions {
@@ -1669,11 +1669,11 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 9px;
+  font-size: 10px;
   color: #8d9c78;
 }
 .trace-count {
-  font-size: 9px;
+  font-size: 10px;
   color: #9eab8a;
   border: 1px solid #dfe6d2;
   padding: 3px 5px;
@@ -1739,7 +1739,7 @@ textarea::placeholder {
 }
 .tool-event small {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   color: #a6b195;
 }
 .tool-event summary > svg {
@@ -1789,7 +1789,7 @@ textarea::placeholder {
   margin-top: 2px;
 }
 .weather-card p {
-  font-size: 9px;
+  font-size: 10px;
   color: #acb697;
   margin-top: 10px;
 }
@@ -1814,7 +1814,7 @@ textarea::placeholder {
   margin: 7px 0;
 }
 .compromise p > b {
-  font-size: 9px;
+  font-size: 10px;
   width: 19px;
   height: 19px;
 }
@@ -1830,7 +1830,7 @@ textarea::placeholder {
   margin-top: 12px;
 }
 .trace-footnote {
-  font-size: 9px;
+  font-size: 10px;
   color: #b4bda5;
   line-height: 1.9;
   border-top: 1px solid #e7ebdc;
@@ -2185,7 +2185,7 @@ textarea::placeholder {
 .final-cost-line small {
   margin-top: 3px;
   color: #a1aa96;
-  font-size: 9px;
+  font-size: 10px;
 }
 .final-cost-line b {
   flex-shrink: 0;
@@ -2216,7 +2216,7 @@ textarea::placeholder {
 .final-costs > p {
   margin-top: 13px;
   color: #a0aa94;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.8;
 }
 .final-compromise {
@@ -2431,7 +2431,7 @@ textarea::placeholder {
     width: 44px;
   }
   .saved-indicator {
-    font-size: 9px;
+    font-size: 10px;
   }
   .workbench-grid {
     grid-template-columns: 220px minmax(0, 1fr) 220px;
@@ -2502,7 +2502,7 @@ textarea::placeholder {
     width: 94px;
   }
   .duration {
-    font-size: 9px;
+    font-size: 10px;
     padding: 4px 5px;
   }
 }
@@ -2694,7 +2694,7 @@ textarea::placeholder {
     gap: 9px;
   }
   .brand small {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 3px;
   }
   .brand-mark {
@@ -2714,7 +2714,7 @@ textarea::placeholder {
     display: none;
   }
   .demo-pill {
-    font-size: 9px;
+    font-size: 10px;
     padding: 4px 6px;
   }
   .avatar-pair span {
@@ -2735,7 +2735,7 @@ textarea::placeholder {
   .step > span {
     width: 19px;
     height: 19px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .step-line {
     width: 10px;
@@ -2752,7 +2752,7 @@ textarea::placeholder {
     gap: 38px;
   }
   .setup-left .eyebrow {
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 1.6px;
   }
   .setup-left h1 {
@@ -2776,7 +2776,7 @@ textarea::placeholder {
     font-size: 12px;
   }
   .field label small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .field-row {
     gap: 13px;
@@ -2813,7 +2813,7 @@ textarea::placeholder {
     min-height: 49px;
   }
   .form-footer {
-    font-size: 9px;
+    font-size: 10px;
     margin-top: 16px;
   }
   .form-footer button {
@@ -2838,7 +2838,7 @@ textarea::placeholder {
     margin-top: 12px;
   }
   .photo-caption > span {
-    font-size: 9px;
+    font-size: 10px;
   }
   .round-stamp {
     width: 80px;
@@ -2912,7 +2912,7 @@ textarea::placeholder {
     font-size: 12px;
   }
   .section-label small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .interest-grid {
     gap: 6px;
@@ -2928,7 +2928,7 @@ textarea::placeholder {
     gap: 4px;
   }
   .rank-list > div {
-    font-size: 9px;
+    font-size: 10px;
     padding: 4px;
   }
   .pref-columns {
@@ -3009,7 +3009,7 @@ textarea::placeholder {
     margin-top: 9px;
   }
   .workbench-heading p {
-    font-size: 9px;
+    font-size: 10px;
     gap: 6px;
     flex-wrap: wrap;
   }
@@ -3117,7 +3117,7 @@ textarea::placeholder {
     font-size: 20px;
   }
   .route-heading > div > span {
-    font-size: 9px;
+    font-size: 10px;
   }
   .route-heading .tag {
     font-size: 8px;
@@ -3151,7 +3151,7 @@ textarea::placeholder {
     top: 11px;
     left: 10px;
     right: 10px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .map-top > span {
     padding: 5px 7px;
@@ -3197,13 +3197,13 @@ textarea::placeholder {
     gap: 4px;
   }
   .stop-tabs > button {
-    font-size: 9px;
+    font-size: 10px;
     gap: 4px;
   }
   .stop-tabs > button > span {
     height: 17px;
     width: 17px;
-    font-size: 9px;
+    font-size: 10px;
   }
   .stop-detail {
     padding: 18px 16px;
@@ -3285,7 +3285,7 @@ textarea::placeholder {
   }
   .workbench-bottom {
     display: block;
-    font-size: 9px;
+    font-size: 10px;
     line-height: 1.9;
     padding: 17px 0 13px;
   }
@@ -3340,7 +3340,7 @@ textarea::placeholder {
     height: auto;
   }
   .final-disclaimer {
-    font-size: 9px !important;
+    font-size: 10px !important;
   }
   .modal {
     padding: 28px 24px;
@@ -3361,10 +3361,10 @@ textarea::placeholder {
     padding: 17px 16px;
   }
   .compact .step {
-    font-size: 9px;
+    font-size: 10px;
   }
   .compact .step > label {
-    font-size: 9px;
+    font-size: 10px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -3530,13 +3530,13 @@ textarea::placeholder {
     padding: 0;
   }
   .candidate-label {
-    font-size: 9px;
+    font-size: 10px;
   }
   .candidate-stats .match {
-    font-size: 9px;
+    font-size: 10px;
   }
   .candidate-stats small {
-    font-size: 9px;
+    font-size: 10px;
   }
   .candidate-stats {
     gap: 2px;
@@ -3565,7 +3565,7 @@ textarea::placeholder {
     font-size: 10px;
   }
   .route-heading .tag {
-    font-size: 9px;
+    font-size: 10px;
   }
   .workbench-heading p {
     font-size: 10px;
